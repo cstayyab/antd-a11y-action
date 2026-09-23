@@ -1,0 +1,14 @@
+{
+  "name": "antd-a11y-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runner dependencies for the antd A11y Guard runtime sub-action. Installed on the runner with npm ci.",
+  "type": "module",
+  "dependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "~1.56.1",
+    "fast-glob": "^3.3.3",
+    "playwright-core": "~1.56.1",
+    "source-map-js": "^1.2.1"
+  }
+}

@@ -4,3 +4,4 @@ coverage/
 *.sarif
 !tests/**/*.sarif
 .DS_Store
+runtime/test-results/

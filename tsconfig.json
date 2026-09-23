@@ -2,10 +2,12 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
     "types": ["node", "vitest/globals"],
     "paths": {
       "eslint-plugin-antd-a11y": ["./packages/eslint-plugin-antd-a11y/src/index.ts"]
     }
   },
-  "include": ["src", "packages/*/src", "packages/*/tests", "tests", "vitest.config.ts"]
+  "include": ["src", "packages/*/src", "packages/*/tests", "tests", "runtime/*.ts", "vitest.config.ts"]
 }

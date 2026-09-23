@@ -4,8 +4,8 @@ import { IMPACTS, type Impact } from './types.js';
 export type Mode = 'static' | 'theme' | 'runtime';
 const MODES: readonly Mode[] = ['static', 'theme', 'runtime'];
 
-// Declared in action.yml for the v1 runtime/baseline layers; accepted but not used yet.
-const RESERVED_INPUTS = ['baseline', 'start-command', 'target-url', 'routes'];
+// Declared in action.yml for the baseline layer; accepted but not used yet.
+const RESERVED_INPUTS = ['baseline'];
 
 export interface Inputs {
   modes: Mode[];
@@ -56,13 +56,15 @@ export function readInputs(): Inputs {
     }
   }
   for (const mode of modes) {
-    if (mode !== 'static') {
+    if (mode === 'runtime') {
+      core.warning('mode "runtime" runs as its own step: add `uses: cstayyab/antd-a11y-action/runtime@v1`. This step runs "static" only.');
+    } else if (mode !== 'static') {
       core.warning(`mode "${mode}" is not available yet in this release and will be skipped. Only "static" runs.`);
     }
   }
   for (const name of RESERVED_INPUTS) {
     if (core.getInput(name)) {
-      core.warning(`Input "${name}" is reserved for the runtime and baseline layers and is ignored in this release.`);
+      core.warning(`Input "${name}" is reserved for the baseline layer and is ignored in this release.`);
     }
   }
 

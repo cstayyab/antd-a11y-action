@@ -8,8 +8,8 @@ branding:
 inputs:
   mode:
     description: >-
-      Comma-separated layers to run: static, theme, runtime.
-      This release runs "static" only; the others log a warning and are skipped.
+      Comma-separated layers to run: static, theme, runtime. This action runs "static";
+      the runtime check is the separate cstayyab/antd-a11y-action/runtime sub-action.
     default: static
   fail-on:
     description: Lowest impact that fails the check (minor | moderate | serious | critical).
@@ -41,18 +41,9 @@ inputs:
   github-token:
     description: Token used to list PR files and write the PR comment.
     default: ${{ github.token }}
-  # Reserved for the runtime (Playwright + axe) and baseline layers; ignored in this release.
+  # Reserved for the baseline layer; ignored in this release.
   baseline:
     description: Reserved. Path to a baseline file of known violations.
-    required: false
-  start-command:
-    description: Reserved. Command that starts the app for runtime scans.
-    required: false
-  target-url:
-    description: Reserved. Base URL of the running app for runtime scans.
-    required: false
-  routes:
-    description: Reserved. JSON file listing routes to scan at runtime.
     required: false
 
 outputs:

@@ -6,6 +6,7 @@ export function annotate(result: ScanResult, max: number): number {
   let emitted = 0;
   for (const finding of result.findings) {
     if (emitted >= max) break;
+    if (!finding.file) continue; // nothing in the diff to attach it to
     const props: core.AnnotationProperties = {
       title: `${finding.ruleId} (${finding.impact})`,
       file: finding.file,
@@ -20,9 +21,10 @@ export function annotate(result: ScanResult, max: number): number {
     else core.warning(finding.message, props);
     emitted += 1;
   }
-  if (result.findings.length > emitted) {
+  const annotatable = result.findings.filter((f) => f.file).length;
+  if (annotatable > emitted) {
     core.warning(
-      `Showing ${emitted} of ${result.findings.length} findings as annotations. See the SARIF file or PR comment for the rest.`,
+      `Showing ${emitted} of ${annotatable} findings as annotations. See the SARIF file or PR comment for the rest.`,
     );
   }
   for (const error of result.parseErrors) {

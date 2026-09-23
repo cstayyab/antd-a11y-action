@@ -1,0 +1,20 @@
+{
+  "name": "antd-a11y-fixture-next",
+  "private": true,
+  "description": "Next.js app the runtime self-test crawls. /bad and /rsc-bad contain deliberate violations.",
+  "scripts": {
+    "dev": "next dev --turbopack"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "antd": "^6.6.5",
+    "next": "~15.5.26",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/react": "^19.3.0",
+    "typescript": "~5.9.3"
+  }
+}

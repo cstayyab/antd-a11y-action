@@ -4,10 +4,17 @@ export const COMMENT_MARKER = '<!-- antd-a11y-guard -->';
 const MAX_ROWS = 50;
 
 export interface MarkdownContext {
-  failOn: Impact;
+  failOn: Impact | 'none';
   /** `https://github.com/owner/repo/blob/<sha>` for file links; plain paths when absent. */
   blobBase?: string;
   scope: string;
+  /** Sticky-comment marker; each layer (static, runtime) keeps its own comment. */
+  marker?: string;
+  title?: string;
+  /** What was scanned, e.g. "4 routes". Defaults to the file count. */
+  scanned?: string;
+  /** Shown as a quote above the results, e.g. a guard health warning. */
+  banner?: string;
 }
 
 function escapeCell(text: string): string {
@@ -17,14 +24,16 @@ function escapeCell(text: string): string {
 export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string {
   const blocking = result.findings.filter((f) => f.blocking).length;
   const other = result.findings.length - blocking;
-  const lines: string[] = [COMMENT_MARKER, '## antd A11y Guard', ''];
+  const lines: string[] = [ctx.marker ?? COMMENT_MARKER, `## ${ctx.title ?? 'antd A11y Guard'}`, ''];
+  if (ctx.banner) lines.push(`> ${ctx.banner}`, '');
 
-  const files = `${result.filesScanned} ${result.filesScanned === 1 ? 'file' : 'files'}`;
+  const files = ctx.scanned ?? `${result.filesScanned} ${result.filesScanned === 1 ? 'file' : 'files'}`;
   if (result.findings.length === 0) {
     lines.push(`No accessibility issues found in ${files} (${ctx.scope}).`);
   } else {
     const verdict = blocking > 0 ? `**${blocking} blocking**` : '**0 blocking**';
-    lines.push(`${verdict} · ${other} below the \`${ctx.failOn}\` threshold · ${files} scanned (${ctx.scope})`);
+    const below = ctx.failOn === 'none' ? `${other} reported (fail-on: none)` : `${other} below the \`${ctx.failOn}\` threshold`;
+    lines.push(`${verdict} · ${below} · ${files} scanned (${ctx.scope})`);
     lines.push('');
 
     const byRule = new Map<string, Record<Impact, number>>();
@@ -52,9 +61,15 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
       '| --- | --- | --- | --- |',
     );
     for (const f of shown) {
-      const loc = `${f.file}:${f.line}`;
-      const link = ctx.blobBase ? `[${escapeCell(loc)}](${ctx.blobBase}/${encodeURI(f.file)}#L${f.line})` : `\`${loc}\``;
-      lines.push(`| ${f.blocking ? 'Blocking' : f.impact} | ${link} | \`${f.ruleId}\` | ${escapeCell(f.message)} |`);
+      let where: string;
+      if (f.file) {
+        const loc = `${f.file}:${f.line ?? 1}`;
+        where = ctx.blobBase ? `[${escapeCell(loc)}](${ctx.blobBase}/${encodeURI(f.file)}#L${f.line ?? 1})` : `\`${loc}\``;
+      } else {
+        where = f.target ? `\`${escapeCell(f.target)}\`` : 'unknown';
+      }
+      if (f.routes?.length) where += `<br><sub>${escapeCell(f.routes.join(', '))}</sub>`;
+      lines.push(`| ${f.blocking ? 'Blocking' : f.impact} | ${where} | \`${f.ruleId}\` | ${escapeCell(f.message)} |`);
     }
     lines.push('', '</details>');
   }

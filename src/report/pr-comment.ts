@@ -15,6 +15,7 @@ export async function upsertComment(
   issueNumber: number,
   body: string,
   hasFindings: boolean,
+  marker = COMMENT_MARKER,
 ): Promise<void> {
   try {
     const comments = await octokit.paginate(octokit.rest.issues.listComments, {
@@ -22,7 +23,7 @@ export async function upsertComment(
       issue_number: issueNumber,
       per_page: 100,
     });
-    const existing = comments.find((c) => c.body?.includes(COMMENT_MARKER));
+    const existing = comments.find((c) => c.body?.includes(marker));
     if (existing) {
       await octokit.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
       core.info(`Updated PR comment ${existing.html_url}`);

@@ -129,9 +129,9 @@ export class A11yLinter {
     result.findings.sort(
       (a, b) =>
         Number(b.blocking) - Number(a.blocking) ||
-        a.file.localeCompare(b.file) ||
-        a.line - b.line ||
-        a.column - b.column,
+        (a.file ?? '').localeCompare(b.file ?? '') ||
+        (a.line ?? 0) - (b.line ?? 0) ||
+        (a.column ?? 0) - (b.column ?? 0),
     );
     return result;
   }

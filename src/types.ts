@@ -9,12 +9,15 @@ export function impactRank(impact: Impact): number {
 }
 
 export interface Finding {
-  /** Repo-relative, forward slashes. */
-  file: string;
-  line: number;
-  column: number;
+  /** Repo-relative, forward slashes. Absent for runtime findings that could not be tied to source. */
+  file?: string;
+  line?: number;
+  column?: number;
   endLine?: number;
   endColumn?: number;
+  /** Runtime findings: routes where the issue was seen, and the DOM selector (axe) or callsite. */
+  routes?: string[];
+  target?: string;
   ruleId: string;
   message: string;
   impact: Impact;

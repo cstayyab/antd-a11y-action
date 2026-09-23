@@ -19,7 +19,13 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['packages/*/tests/rules/**/*.test.ts', 'tests/**/*.test.ts'],
+          exclude: ['tests/runtime/**'],
         },
+      },
+      // The runtime sub-action: guard, setup scripts, resolver and reporter.
+      {
+        extends: true,
+        test: { name: 'runtime', include: ['tests/runtime/**/*.test.{ts,tsx}'] },
       },
       // The DOM checks run once per supported antd major. `antd` in package.json is v6;
       // v5 is installed under the npm aliases antd-v5 / @ant-design/icons-v5.

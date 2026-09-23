@@ -1,0 +1,18 @@
+{
+  "name": "next-a11y",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dev-time accessibility guard injected by antd A11y Guard's runtime check. Never shipped to production.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./client": "./src/client.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "next": ">=15.3",
+    "react": ">=19.1",
+    "axe-core": ">=4.10",
+    "dom-accessibility-api": ">=0.7"
+  }
+}

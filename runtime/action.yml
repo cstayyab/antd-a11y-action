@@ -1,0 +1,166 @@
+name: antd A11y Guard (runtime)
+description: >-
+  Start the app, crawl its routes with Playwright and report runtime accessibility issues.
+  In Next.js apps (15.3+) an injected guard blames issues on the source line that rendered them.
+author: cstayyab
+branding:
+  icon: eye
+  color: blue
+
+inputs:
+  framework:
+    description: auto (Next.js if installed and no start-command), next, or generic.
+    default: auto
+  working-directory:
+    description: App directory, relative to the repository root. Dependencies must already be installed.
+    default: .
+  start-command:
+    description: >-
+      Command that starts the app. Required in generic mode unless target-url points at an app that is
+      already running. In Next mode it overrides the default `npx next dev --turbopack -p <port>`.
+    default: ''
+  target-url:
+    description: Base URL of the app in generic mode.
+    default: http://localhost:3000
+  port:
+    description: Port for the Next.js dev server in Next mode.
+    default: '3100'
+  routes:
+    description: Routes to crawl, one per line. Use this for dynamic routes (/products/demo).
+    default: ''
+  exclude-routes:
+    description: Regular expressions, one per line; matching routes are skipped.
+    default: ''
+  discover-routes:
+    description: In Next mode, also crawl static App Router pages found under app/.
+    default: 'true'
+  max-routes:
+    description: Maximum number of routes to crawl.
+    default: '50'
+  storage-state:
+    description: Playwright storageState JSON (relative to working-directory) for signed-in pages.
+    default: ''
+  interactions:
+    description: ESM module (relative to working-directory) exporting `default async ({ page, route }) => {}` to open modals, dropdowns, tabs.
+    default: ''
+  wcag-tags:
+    description: axe-core tags to run.
+    default: wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa
+  fail-on:
+    description: Lowest impact that fails the check (minor | moderate | serious | critical | none).
+    default: serious
+  require-guard:
+    description: In Next mode, fail when the guard did not intercept any renders.
+    default: 'true'
+  comment:
+    description: Post or update one sticky PR comment with the runtime results.
+    default: 'true'
+  sarif-file:
+    description: Where to write the SARIF report (only findings mapped to a source file), relative to the repository root.
+    default: antd-a11y-runtime.sarif
+  max-annotations:
+    description: Maximum number of inline annotations.
+    default: '50'
+  artifact-name:
+    description: Name of the uploaded results artifact. Set a different one when the action runs twice in a job.
+    default: antd-a11y-runtime
+  github-token:
+    description: Token used to write the PR comment.
+    default: ${{ github.token }}
+
+outputs:
+  total:
+    description: Total findings (guard + axe).
+    value: ${{ steps.report.outputs.total }}
+  blocking:
+    description: Findings at or above fail-on.
+    value: ${{ steps.report.outputs.blocking }}
+  critical:
+    description: Critical findings.
+    value: ${{ steps.report.outputs.critical }}
+  serious:
+    description: Serious findings.
+    value: ${{ steps.report.outputs.serious }}
+  guard-active:
+    description: Whether the Next.js guard intercepted renders.
+    value: ${{ steps.report.outputs.guard-active }}
+  sarif-file:
+    description: Absolute path of the SARIF report.
+    value: ${{ steps.report.outputs.sarif-file }}
+
+runs:
+  using: composite
+  steps:
+    # Inputs reach scripts through env, never through ${{ }} inside run:, to avoid script injection.
+    - name: a11y · prepare
+      shell: bash
+      env:
+        IN_FRAMEWORK: ${{ inputs.framework }}
+        IN_WD: ${{ inputs.working-directory }}
+        IN_START_COMMAND: ${{ inputs.start-command }}
+        IN_TARGET_URL: ${{ inputs.target-url }}
+        IN_PORT: ${{ inputs.port }}
+        IN_STORAGE: ${{ inputs.storage-state }}
+        IN_INTERACTIONS: ${{ inputs.interactions }}
+      run: node "$GITHUB_ACTION_PATH/scripts/prepare.mjs"
+
+    - name: a11y · install runner dependencies
+      shell: bash
+      run: npm ci --prefix "$GITHUB_ACTION_PATH" --no-audit --no-fund
+
+    - name: a11y · playwright version
+      id: pw
+      shell: bash
+      run: echo "version=$(node -p "require(process.env.GITHUB_ACTION_PATH + '/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    - name: a11y · cache browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: antd-a11y-pw-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+    - name: a11y · install chromium
+      shell: bash
+      run: '"$GITHUB_ACTION_PATH/node_modules/.bin/playwright" install --with-deps chromium'
+
+    - name: a11y · inject guard (working tree only)
+      if: env.A11Y_MODE == 'next'
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/scripts/inject-next.mjs"
+
+    - name: a11y · routes
+      shell: bash
+      env:
+        IN_ROUTES: ${{ inputs.routes }}
+        IN_EXCLUDE_ROUTES: ${{ inputs.exclude-routes }}
+        IN_DISCOVER: ${{ inputs.discover-routes }}
+        IN_MAX_ROUTES: ${{ inputs.max-routes }}
+      run: node "$GITHUB_ACTION_PATH/scripts/routes.mjs"
+
+    - name: a11y · crawl
+      shell: bash
+      env:
+        IN_TAGS: ${{ inputs.wcag-tags }}
+      run: |
+        "$GITHUB_ACTION_PATH/node_modules/.bin/playwright" test -c "$GITHUB_ACTION_PATH/playwright.config.ts" \
+          || echo "::warning::a11y runtime: some routes failed to load; see the log above. Partial results are still reported."
+
+    - name: a11y · report
+      id: report
+      shell: bash
+      env:
+        IN_FAIL_ON: ${{ inputs.fail-on }}
+        IN_REQUIRE_GUARD: ${{ inputs.require-guard }}
+        IN_COMMENT: ${{ inputs.comment }}
+        IN_TOKEN: ${{ inputs.github-token }}
+        IN_SARIF_FILE: ${{ inputs.sarif-file }}
+        IN_MAX_ANNOTATIONS: ${{ inputs.max-annotations }}
+      run: node "$GITHUB_ACTION_PATH/../dist/runtime-report.mjs"
+
+    - name: a11y · upload results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ env.A11Y_OUT }}
+        if-no-files-found: ignore

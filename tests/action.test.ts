@@ -84,7 +84,7 @@ describe('lint', () => {
   it('reports every rule in fixtures/app/src/bad and nothing in src/good', async () => {
     const result = await scanFixture();
     expect(result.parseErrors).toEqual([]);
-    expect(result.findings.filter((f) => f.file.startsWith('src/good/'))).toEqual([]);
+    expect(result.findings.filter((f) => f.file?.startsWith('src/good/'))).toEqual([]);
     const rules = new Set(result.findings.map((f) => f.ruleId));
     const antdRules = (await readdir(path.join(root, 'packages/eslint-plugin-antd-a11y/src/rules'))).map(
       (f) => `antd-a11y/${f.replace(/\.ts$/, '')}`,

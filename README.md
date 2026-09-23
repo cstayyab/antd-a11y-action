@@ -2,7 +2,7 @@
 
 A GitHub Action that blocks pull requests adding accessibility problems to React + [Ant Design](https://ant.design) apps. It catches the antd-specific ones that axe and `eslint-plugin-jsx-a11y` miss, because those tools only see plain JSX elements or rendered DOM.
 
-> This release ships the **static** layer: 10 antd rules plus jsx-a11y's recommended set, with inline annotations, SARIF for Code Scanning and a sticky PR comment. The runtime (Playwright + axe) and theme contrast layers are next; see [Roadmap](#roadmap).
+> Two layers: the **static** action (10 antd rules plus jsx-a11y's recommended set, on changed files) and the **[runtime check](#runtime-check)** sub-action (starts your app, crawls routes with Playwright + axe, and in Next.js apps blames issues on the source line that rendered them). Both report through inline annotations, SARIF for Code Scanning and a sticky PR comment. The theme contrast layer is next; see [Roadmap](#roadmap).
 
 ## Quick start
 
@@ -69,9 +69,100 @@ Impact uses axe-core's scale, and `fail-on` (default `serious`) decides what blo
 | `github-token` | `${{ github.token }}` | Used to list PR files and write the comment |
 | `mode` | `static` | `theme` and `runtime` are accepted but skipped with a warning in this release |
 
-`baseline`, `start-command`, `target-url` and `routes` are reserved for the runtime layer and ignored for now.
+`baseline` is reserved for the baseline layer and ignored for now. The runtime check is a separate step; see below.
 
 **Outputs:** `violations`, `blocking-violations`, `sarif-file`.
+
+## Runtime check
+
+The static rules read your source. The runtime check starts the app and looks at what actually renders, including markup inside antd and other libraries, portals and client-side state. Add it as its own job:
+
+```yaml
+  antd-a11y-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - uses: cstayyab/antd-a11y-action/runtime@v1
+        id: runtime
+        env:
+          NEXT_PUBLIC_API_URL: https://staging.example.com   # anything the app needs at dev time
+        with:
+          routes: |            # dynamic routes need concrete URLs
+            /products/demo-product
+          exclude-routes: |
+            ^/admin
+          interactions: .github/a11y-interactions.mjs
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always() && steps.runtime.outputs.sarif-file != ''
+        with:
+          sarif_file: ${{ steps.runtime.outputs.sarif-file }}
+          category: antd-a11y-runtime
+```
+
+It runs in one of two modes (`framework: auto` picks for you):
+
+| Mode | When | What you get |
+| --- | --- | --- |
+| **Next.js** | `next` 15.3+ installed and no `start-command` | Runs `next dev --turbopack` and injects a guard through `instrumentation-client` (working tree only; nothing is committed). The guard patches `React.createElement` and the JSX runtime, so issues inside antd components are blamed on **your** line that used the component, and issues in your own markup on the line that wrote it. Also crawls every static App Router page, then runs axe. |
+| **Generic** | Any other app | Starts `start-command` (or uses an app already running at `target-url`), crawls `routes` (default `/`) and runs axe. Findings point at DOM selectors, not source lines. |
+
+Only rendered UI is checked. To audit modals, dropdowns and tabs, open them in an `interactions` module:
+
+```js
+// .github/a11y-interactions.mjs
+export default async function ({ page, route }) {
+  if (route === '/settings') {
+    await page.getByRole('tab', { name: 'Billing' }).click();
+    await page.getByRole('button', { name: 'Add card' }).click();
+  }
+}
+```
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `framework` | `auto` | `auto`, `next` or `generic` |
+| `working-directory` | `.` | App directory; install its dependencies first |
+| `start-command` | | Command that starts the app (generic), or overrides `next dev` (Next) |
+| `target-url` | `http://localhost:3000` | Base URL in generic mode |
+| `port` | `3100` | Next dev server port |
+| `routes` | | Routes to crawl, one per line |
+| `exclude-routes` | | Regexes, one per line |
+| `discover-routes` | `true` | Crawl static App Router pages (Next mode) |
+| `max-routes` | `50` | Cap on routes |
+| `storage-state` | | Playwright `storageState` JSON for signed-in pages |
+| `interactions` | | ESM module run on each route before scanning |
+| `wcag-tags` | `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa` | axe tags |
+| `fail-on` | `serious` | `minor`, `moderate`, `serious`, `critical` or `none` |
+| `require-guard` | `true` | Next mode: fail if the guard intercepted nothing |
+| `comment` | `true` | Sticky PR comment (separate from the static one) |
+| `sarif-file` | `antd-a11y-runtime.sarif` | Only findings mapped to a source file go into SARIF |
+| `artifact-name` | `antd-a11y-runtime` | Per-route JSON results are uploaded under this name |
+
+**Outputs:** `total`, `blocking`, `critical`, `serious`, `guard-active`, `sarif-file`.
+
+**Before you adopt it**
+
+- The check runs the pull request's code with a dev server. Use it on `pull_request`, never on `pull_request_target`.
+- In Next mode the guard is written into the working tree. If a later step in the **same job** builds or deploys the app, it would pick it up: keep the check in its own job, or run `git checkout -- . && git clean -fdx -- .a11y-guard '*instrumentation-client*'` in the app directory after it.
+- Guard requirements: Next 15.3+ (for `instrumentation-client`) and React 19.1+ (for `captureOwnerStack`; older React still works, without source lines). Verified on Next 15.5; Next 16 logs a warning until verified.
+- Server Components never render in the browser, so only axe sees them (no source line).
+- A library's own markup choices (for example antd's modal mask closing on click) are reported as minor, since app code can't change them.
+
+| Symptom | Fix |
+| --- | --- |
+| Route times out | Lower `max-routes` or raise the job's `timeout-minutes`; the first hit compiles the route |
+| Everything redirects to login | Create a `storageState` in an earlier step and pass `storage-state` |
+| `next dev --turbopack` fails | Set `start-command: npx next dev -p 3100` to use webpack |
+| "Guard did not intercept any renders" | Check the inject step log; `instrumentation-client` must sit where Next expects it (root, or `src/`) |
+| Comment step skipped on fork PRs | Expected: forks get a read-only token. The job summary and artifact still have everything |
 
 ## Suppressing a finding
 
@@ -105,8 +196,8 @@ export default [antdA11y.configs.recommended];
 
 | Phase | Scope |
 | --- | --- |
-| **MVP (this release)** | 10 static antd rules, SARIF, sticky PR comment, changed-files mode |
-| v1 | Runtime axe scan of app routes (`start-command` + `target-url` + `routes`, Storybook later), baseline file, theme-token contrast audit |
+| **MVP** | 10 static antd rules, SARIF, sticky PR comment, changed-files mode |
+| **v1 (in progress)** | Done: runtime check (Next.js guard + axe, generic axe crawl). Next: baseline file, theme-token contrast audit, Storybook stories |
 | v1.1 | WCAG 2.2 runtime checks (focus not obscured, target size), auth via Playwright `storageState` |
 | v2 | Autofix via suggested changes, antd v4 support |
 
@@ -114,7 +205,8 @@ export default [antdA11y.configs.recommended];
 
 ```sh
 npm ci
-npm run check   # typecheck + lint + tests (rule tests, plus DOM checks against antd 5 and 6)
+npm ci --prefix runtime   # runner deps for the runtime sub-action
+npm run check   # typecheck + lint + tests (rules, DOM checks against antd 5 and 6, runtime)
 npm run build   # bundles the action into dist/ (commit the result)
 ```
 

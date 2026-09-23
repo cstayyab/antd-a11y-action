@@ -4,6 +4,8 @@ name: Self-test
 
 on:
   pull_request:
+  push:
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
@@ -44,3 +46,96 @@ jobs:
         with:
           sarif_file: ${{ steps.guard.outputs.sarif-file }}
           category: antd-a11y-self-test
+
+  # Runtime sub-action against fixtures/next-app (Next 15.5, React 19, antd 6).
+  runtime-next:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: fixtures/next-app/package-lock.json
+      - run: npm ci
+        working-directory: fixtures/next-app
+
+      - name: Run the runtime check (Next mode)
+        id: runtime
+        uses: ./runtime
+        continue-on-error: true
+        with:
+          working-directory: fixtures/next-app
+          framework: next
+          artifact-name: antd-a11y-runtime-next
+          comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+
+      - name: Check the results
+        env:
+          OUTCOME: ${{ steps.runtime.outcome }}
+          GUARD: ${{ steps.runtime.outputs.guard-active }}
+          BLOCKING: ${{ steps.runtime.outputs.blocking }}
+        run: |
+          echo "outcome=$OUTCOME guard-active=$GUARD blocking=$BLOCKING"
+          test "$OUTCOME" = "failure"
+          test "$GUARD" = "true"
+          test "$BLOCKING" -gt 0
+          # The guard must blame each issue on its own line in app/bad/page.tsx.
+          node -e '
+            const r = require(process.env.A11Y_OUT + "/bad.json");
+            const at = (rule, origin) => r.runtime.find((v) => v.rule === rule && v.origin === origin)?.location;
+            const expect = [["accessible-name", "library", 10], ["click-events-need-role", "app", 11], ["image-alt", "app", 12]];
+            for (const [rule, origin, line] of expect) {
+              const loc = at(rule, origin);
+              if (!loc || loc.file !== "app/bad/page.tsx" || loc.line !== line) {
+                console.error(`${rule}: expected app/bad/page.tsx:${line}, got ${JSON.stringify(loc)}`);
+                process.exit(1);
+              }
+            }
+            for (const clean of ["root", "grouped"]) {
+              const page = require(process.env.A11Y_OUT + "/" + clean + ".json");
+              if (page.runtime.length || page.axe.length) { console.error(clean + " should be clean"); process.exit(1); }
+            }
+            console.log("guard blame and clean pages OK");
+          '
+
+  runtime-generic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: fixtures/next-app/package-lock.json
+      - run: npm ci
+        working-directory: fixtures/next-app
+
+      - name: Run the runtime check (generic mode)
+        id: runtime
+        uses: ./runtime
+        continue-on-error: true
+        with:
+          working-directory: fixtures/next-app
+          framework: generic
+          start-command: npx next dev -p 3200
+          target-url: http://localhost:3200
+          routes: |
+            /
+            /bad
+            /rsc-bad
+          artifact-name: antd-a11y-runtime-generic
+          comment: 'false'
+
+      - name: Check the results
+        env:
+          OUTCOME: ${{ steps.runtime.outcome }}
+          GUARD: ${{ steps.runtime.outputs.guard-active }}
+          BLOCKING: ${{ steps.runtime.outputs.blocking }}
+        run: |
+          echo "outcome=$OUTCOME guard-active=$GUARD blocking=$BLOCKING"
+          test "$OUTCOME" = "failure"
+          test "$GUARD" = "false"
+          test "$BLOCKING" -gt 0

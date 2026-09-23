@@ -1,0 +1,5 @@
+.next/
+next-env.d.ts
+# Written by the runtime check; never committed.
+.a11y-guard/
+instrumentation-client.*

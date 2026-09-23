@@ -7,8 +7,10 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 await rm(`${root}/dist`, { recursive: true, force: true });
 
 const result = await build({
-  entryPoints: [`${root}/src/index.ts`],
-  outfile: `${root}/dist/index.mjs`,
+  // index.mjs: the static action. runtime-report.mjs: the runtime sub-action's reporter.
+  entryPoints: { index: `${root}/src/index.ts`, 'runtime-report': `${root}/src/runtime/index.ts` },
+  outdir: `${root}/dist`,
+  outExtension: { '.js': '.mjs' },
   bundle: true,
   platform: 'node',
   target: 'node20',
@@ -35,5 +37,6 @@ const result = await build({
   logLevel: 'warning',
 });
 
-const bytes = Object.values(result.metafile.outputs).reduce((sum, o) => sum + o.bytes, 0);
-console.log(`dist/index.mjs built (${(bytes / 1024 / 1024).toFixed(2)} MB)`);
+for (const [file, output] of Object.entries(result.metafile.outputs)) {
+  if (file.endsWith('.mjs')) console.log(`${file.replace(`${root}/`, '')} built (${(output.bytes / 1024 / 1024).toFixed(2)} MB)`);
+}
