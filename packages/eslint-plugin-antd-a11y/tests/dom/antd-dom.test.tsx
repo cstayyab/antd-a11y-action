@@ -25,9 +25,15 @@ import {
   Switch,
   Table,
   Tooltip,
+  version as antdVersion,
 } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { afterEach, describe, expect, it } from 'vitest';
+
+// vitest.config.ts runs this file once per antd major; make sure the alias really took.
+it(`renders with antd ${process.env.ANTD_MAJOR}`, () => {
+  expect(antdVersion.split('.')[0]).toBe(process.env.ANTD_MAJOR);
+});
 
 window.matchMedia ??= ((query: string) => ({
   matches: false,
@@ -80,9 +86,12 @@ describe('icon-button-has-name', () => {
 });
 
 describe('picker-has-name', () => {
-  it('missing: Select placeholder is not exposed as a name', () => {
+  it('missing: Select placeholder is not exposed as a name', async () => {
     const c = mount(<Select placeholder="Country" options={[{ value: 'pk', label: 'Pakistan' }]} />);
     expect(nameOf(c, '[role="combobox"]')).toBe('');
+    // If antd ever moves the placeholder onto the input, this becomes placeholderOnly.
+    expect(c.querySelector('[role="combobox"]')?.hasAttribute('placeholder')).toBe(false);
+    expect(await axeViolations(c, ['label', 'aria-input-field-name'])).not.toEqual([]);
   });
   it('placeholderOnly: DatePicker is named only by its default placeholder', async () => {
     const c = mount(<DatePicker />);

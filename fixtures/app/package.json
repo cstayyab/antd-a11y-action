@@ -3,8 +3,8 @@
   "private": true,
   "description": "Files the self-test workflow scans. Never built or installed.",
   "dependencies": {
-    "@ant-design/icons": "^5.6.1",
-    "antd": "^5.29.3",
+    "@ant-design/icons": "^6.3.4",
+    "antd": "^6.6.5",
     "react": "^18.3.1"
   }
 }

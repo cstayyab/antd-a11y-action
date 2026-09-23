@@ -32,6 +32,8 @@ jobs:
 
 Nothing to install: the action ships its own parser and rules and ignores your ESLint config. It reads `.js`, `.jsx`, `.ts` and `.tsx` files.
 
+**Supports antd 5 and 6.** The rules behave the same on both, and CI checks every rule against the rendered DOM of each major.
+
 ## What it catches
 
 | Rule | Catches | Impact |
@@ -49,7 +51,7 @@ Nothing to install: the action ships its own parser and rules and ignores your E
 
 Impact uses axe-core's scale, and `fail-on` (default `serious`) decides what blocks the PR. Anything below the threshold still appears as a warning, in SARIF, and in the PR comment.
 
-**Built to stay quiet when unsure.** A rule only reports on components it can trace back to an `antd` import (named, aliased, namespace, `antd/es/*`, or `const { Item } = Form`). Spread props, `id`s and custom children count as "may be labelled". Each rule's claim about antd's markup is also checked in CI by rendering real antd 5 and inspecting the DOM (`packages/eslint-plugin-antd-a11y/tests/dom`).
+**Built to stay quiet when unsure.** A rule only reports on components it can trace back to an `antd` import (named, aliased, namespace, `antd/es/*`, or `const { Item } = Form`). Spread props, `id`s and custom children count as "may be labelled". Each rule's claim about antd's markup is also checked in CI by rendering real antd and inspecting the DOM (`packages/eslint-plugin-antd-a11y/tests/dom`).
 
 ## Inputs
 
@@ -106,13 +108,13 @@ export default [antdA11y.configs.recommended];
 | **MVP (this release)** | 10 static antd rules, SARIF, sticky PR comment, changed-files mode |
 | v1 | Runtime axe scan of app routes (`start-command` + `target-url` + `routes`, Storybook later), baseline file, theme-token contrast audit |
 | v1.1 | WCAG 2.2 runtime checks (focus not obscured, target size), auth via Playwright `storageState` |
-| v2 | Autofix via suggested changes, antd v4/v5/v6 support matrix |
+| v2 | Autofix via suggested changes, antd v4 support |
 
 ## Development
 
 ```sh
 npm ci
-npm run check   # typecheck + lint + tests (rule tests and antd DOM checks)
+npm run check   # typecheck + lint + tests (rule tests, plus DOM checks against antd 5 and 6)
 npm run build   # bundles the action into dist/ (commit the result)
 ```
 

@@ -28,7 +28,8 @@
     "minimatch": "^10.2.6"
   },
   "devDependencies": {
-    "@ant-design/icons": "^5.6.1",
+    "@ant-design/icons": "^6.3.4",
+    "@ant-design/icons-v5": "npm:@ant-design/icons@^5.6.1",
     "@eslint/js": "^9.39.5",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.19.0",
@@ -36,7 +37,8 @@
     "@types/react-dom": "^18.3.7",
     "ajv": "^8.20.0",
     "ajv-draft-04": "^1.0.0",
-    "antd": "^5.29.3",
+    "antd": "^6.6.5",
+    "antd-v5": "npm:antd@^5.29.3",
     "axe-core": "^4.13.0",
     "dom-accessibility-api": "^0.7.1",
     "esbuild": "^0.28.2",

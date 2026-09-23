@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
+const DOM_TESTS = ['packages/*/tests/dom/**/*.test.{ts,tsx}'];
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -11,6 +13,30 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    include: ['packages/*/tests/**/*.test.{ts,tsx}', 'tests/**/*.test.ts'],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['packages/*/tests/rules/**/*.test.ts', 'tests/**/*.test.ts'],
+        },
+      },
+      // The DOM checks run once per supported antd major. `antd` in package.json is v6;
+      // v5 is installed under the npm aliases antd-v5 / @ant-design/icons-v5.
+      {
+        extends: true,
+        resolve: {
+          alias: [
+            { find: /^antd$/, replacement: 'antd-v5' },
+            { find: /^@ant-design\/icons$/, replacement: '@ant-design/icons-v5' },
+          ],
+        },
+        test: { name: 'dom-antd5', include: DOM_TESTS, env: { ANTD_MAJOR: '5' } },
+      },
+      {
+        extends: true,
+        test: { name: 'dom-antd6', include: DOM_TESTS, env: { ANTD_MAJOR: '6' } },
+      },
+    ],
   },
 });
