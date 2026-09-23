@@ -126,6 +126,35 @@ export default async function ({ page, route }) {
 }
 ```
 
+### Signed-in pages
+
+The action starts the app itself, so sign in with a `setup` module. It runs once, after the app is up and before any route, and every route then reuses the browser session it leaves behind:
+
+```js
+// .github/a11y-setup.mjs
+export default async function ({ page }) {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(process.env.A11Y_USER);
+  await page.getByLabel('Password').fill(process.env.A11Y_PASS);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL('**/dashboard');
+}
+```
+
+```yaml
+      - uses: cstayyab/antd-a11y-action/runtime@v1
+        env:
+          A11Y_USER: ${{ secrets.A11Y_USER }}
+          A11Y_PASS: ${{ secrets.A11Y_PASS }}
+        with:
+          setup: .github/a11y-setup.mjs
+          fail-on-redirect: true
+```
+
+Because setup signs in against the app the action started, cookies match its host. If you already have a session file for that host, pass it as `storage-state` instead (setup starts from it when both are set). The saved session stays in the runner's temp folder and is never uploaded with the results.
+
+Every route records where it actually landed. A route that ends up on another path (say `/account` → `/login` because the session was missing or expired) is listed in the report, and its findings are labelled with both paths, since they describe the page it landed on. `fail-on-redirect: true` fails the job instead; exclude routes that redirect on purpose with `exclude-routes`.
+
 | Input | Default | Description |
 | --- | --- | --- |
 | `framework` | `auto` | `auto`, `next` or `generic` |
@@ -139,6 +168,8 @@ export default async function ({ page, route }) {
 | `max-routes` | `50` | Cap on routes |
 | `storage-state` | | Playwright `storageState` JSON for signed-in pages |
 | `interactions` | | ESM module run on each route before scanning |
+| `setup` | | ESM module run once before the crawl, e.g. to sign in; its session is reused for every route |
+| `fail-on-redirect` | `false` | Fail when a route ends up on a different path (e.g. `/login`) |
 | `wcag-tags` | `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa` | axe tags |
 | `fail-on` | `serious` | `minor`, `moderate`, `serious`, `critical` or `none` |
 | `require-guard` | `true` | Next mode: fail if the guard intercepted nothing |
@@ -146,7 +177,7 @@ export default async function ({ page, route }) {
 | `sarif-file` | `antd-a11y-runtime.sarif` | Only findings mapped to a source file go into SARIF |
 | `artifact-name` | `antd-a11y-runtime` | Per-route JSON results are uploaded under this name |
 
-**Outputs:** `total`, `blocking`, `critical`, `serious`, `guard-active`, `sarif-file`.
+**Outputs:** `total`, `blocking`, `critical`, `serious`, `guard-active`, `redirects`, `sarif-file`.
 
 **Before you adopt it**
 
@@ -159,7 +190,8 @@ export default async function ({ page, route }) {
 | Symptom | Fix |
 | --- | --- |
 | Route times out | Lower `max-routes` or raise the job's `timeout-minutes`; the first hit compiles the route |
-| Everything redirects to login | Create a `storageState` in an earlier step and pass `storage-state` |
+| Routes redirect to login | Sign in with a `setup` module; the report lists every redirect, and `fail-on-redirect: true` makes them fail the job |
+| "The setup module failed" | The report shows its error. Setup runs in a real browser: wait for the URL or element that proves you are signed in |
 | `next dev --turbopack` fails | Set `start-command: npx next dev --webpack -p 3100` (Next 16) or `npx next dev -p 3100` (Next 15) to use webpack |
 | "Guard did not intercept any renders" | Check the inject step log; `instrumentation-client` must sit where Next expects it (root, or `src/`) |
 | Comment step skipped on fork PRs | Expected: forks get a read-only token. The job summary and artifact still have everything |

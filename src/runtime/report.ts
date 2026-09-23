@@ -17,6 +17,8 @@ export const RUNTIME_MARKER = '<!-- antd-a11y-guard:runtime -->';
 export interface PageResult {
   route: string;
   status: number | null;
+  /** Path the page ended up on when it differs from the route (e.g. /login). */
+  redirectedTo?: string | null;
   guard: { createElement: number; jsx: number; wraps: number } | null;
   runtime: {
     rule: string;
@@ -44,6 +46,8 @@ export interface RuntimeResult extends ScanResult {
   guardActive: boolean;
   /** Routes that did not answer 2xx/3xx. */
   failedRoutes: string[];
+  /** Routes that ended up on a different path; their findings describe that page. */
+  redirects: { route: string; to: string }[];
 }
 
 // Prop-level rules describe how an element was written. Inside a library component that is the
@@ -70,7 +74,12 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
     routes: pages.map((p) => p.route).sort(),
     guardActive: pages.some((p) => p.guard && (p.guard.createElement > 0 || p.guard.jsx > 0)),
     failedRoutes: pages.filter((p) => p.status !== null && p.status >= 400).map((p) => p.route),
+    redirects: pages
+      .filter((p): p is PageResult & { redirectedTo: string } => Boolean(p.redirectedTo))
+      .map((p) => ({ route: p.route, to: p.redirectedTo })),
   };
+  // Findings on a redirected page belong to where it landed, so label them "/account → /login".
+  const label = (p: PageResult) => (p.redirectedTo ? `${p.route} → ${p.redirectedTo}` : p.route);
   const merged = new Map<string, Finding>();
   const add = (key: string, route: string, make: () => Finding) => {
     const existing = merged.get(key);
@@ -96,7 +105,7 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
       // Origin is part of the key: with file-only (webpack) locations, an app element and a
       // library-internal one in the same file must stay separate findings.
       const key = `${info.id}|${v.origin ?? ''}|${file ?? v.site ?? v.selector ?? v.message}|${v.location?.line ?? ''}`;
-      add(key, page.route, () => ({
+      add(key, label(page), () => ({
         file,
         line: v.location?.line,
         column: v.location?.column,
@@ -112,7 +121,7 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
       const info = axeRuleInfo(v.id, v.help, v.helpUrl, impact);
       if (!result.rules.has(info.id)) result.rules.set(info.id, info);
       for (const target of v.targets) {
-        add(`${info.id}|${target}`, page.route, () => ({
+        add(`${info.id}|${target}`, label(page), () => ({
           ruleId: info.id,
           message: v.help,
           impact,
@@ -143,6 +152,16 @@ export async function readPages(dir: string): Promise<PageResult[]> {
   return Promise.all(names.map(async (f) => JSON.parse(await readFile(path.join(dir, f), 'utf8')) as PageResult));
 }
 
+async function readSetupStatus(file: string | undefined): Promise<{ ok: boolean; error?: string } | null> {
+  if (!file) return null;
+  try {
+    return JSON.parse(await readFile(file, 'utf8'));
+  } catch {
+    // The setup test never wrote its status: Playwright did not get that far (e.g. the server failed to start).
+    return { ok: false, error: 'it did not run; see the crawl step log' };
+  }
+}
+
 function parseFailOn(value: string | undefined): FailOn {
   const v = (value || 'serious').toLowerCase();
   if (v === 'none' || (IMPACTS as readonly string[]).includes(v)) return v as FailOn;
@@ -156,6 +175,11 @@ export async function run(env = process.env): Promise<void> {
   const workspace = env.GITHUB_WORKSPACE ?? process.cwd();
   const cwd = env.A11Y_CWD ?? workspace;
 
+  const setupStatus = await readSetupStatus(env.A11Y_SETUP_STATUS);
+  if (setupStatus && !setupStatus.ok) {
+    core.setFailed(`The setup module failed, so no route was crawled: ${setupStatus.error}`);
+    return;
+  }
   const pages = await readPages(env.A11Y_OUT ?? '');
   if (pages.length === 0) {
     core.setFailed('The runtime check produced no results: no route loaded. See the crawl step log.');
@@ -182,6 +206,12 @@ export async function run(env = process.env): Promise<void> {
     const failed = `Routes that returned an error status: ${result.failedRoutes.join(', ')}.`;
     banner = banner ? `${banner}<br>${failed}` : failed;
   }
+  if (result.redirects.length > 0) {
+    const list = result.redirects.map((r) => `${r.route} → ${r.to}`).join(', ');
+    const note = `Redirected, so the page it landed on was checked instead: ${list}. For signed-in pages, sign in with the \`setup\` input.`;
+    banner = banner ? `${banner}<br>${note}` : note;
+    for (const r of result.redirects) core.warning(`Route ${r.route} redirected to ${r.to}.`);
+  }
 
   const sha = github.context.payload.pull_request?.head?.sha ?? github.context.sha;
   const repository = env.GITHUB_REPOSITORY;
@@ -205,12 +235,16 @@ export async function run(env = process.env): Promise<void> {
   core.setOutput('total', result.findings.length);
   core.setOutput('blocking', blockingCount);
   core.setOutput('guard-active', result.guardActive);
+  core.setOutput('redirects', result.redirects.length);
   core.setOutput('sarif-file', sarifPath);
   for (const impact of IMPACTS) core.setOutput(impact, result.findings.filter((f) => f.impact === impact).length);
 
   const problems: string[] = [];
   if (blockingCount > 0) problems.push(`${blockingCount} accessibility ${blockingCount === 1 ? 'issue' : 'issues'} at or above "${failOn}" impact`);
   if (requireGuard && !result.guardActive) problems.push('the guard did not intercept any renders (set require-guard: false to allow axe-only runs)');
+  if (env.IN_FAIL_ON_REDIRECT === 'true' && result.redirects.length > 0) {
+    problems.push(`${result.redirects.length} ${result.redirects.length === 1 ? 'route' : 'routes'} redirected (${result.redirects.map((r) => `${r.route} → ${r.to}`).join(', ')})`);
+  }
   if (problems.length > 0) core.setFailed(`Runtime check: ${problems.join('; ')}.`);
   else core.info(`Runtime check passed: ${result.findings.length} findings, none at or above "${failOn}".`);
 }

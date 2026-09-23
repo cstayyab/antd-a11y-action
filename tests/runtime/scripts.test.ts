@@ -64,6 +64,15 @@ describe('prepare', () => {
     expect(vars).toMatchObject({ A11Y_MODE: 'generic', A11Y_DEV_CMD: 'npm run preview', A11Y_BASE_URL: 'http://localhost:4173' });
   });
 
+  it('exports the setup module and keeps the saved session out of the results folder', () => {
+    const cwd = tmpApp({ 'node_modules/next/package.json': pkg('15.5.26'), 'a11y/setup.mjs': 'export default () => {}' });
+    const { vars } = base(cwd, { IN_SETUP: 'a11y/setup.mjs' });
+    expect(vars.A11Y_SETUP).toBe(path.join(cwd, 'a11y/setup.mjs'));
+    expect(path.dirname(vars.A11Y_AUTH_STATE)).toBe(path.dirname(vars.A11Y_OUT));
+    expect(vars.A11Y_AUTH_STATE.startsWith(vars.A11Y_OUT)).toBe(false);
+    expect(base(cwd).vars.A11Y_AUTH_STATE).toBe('');
+  });
+
   it('rejects paths outside the repository and bad framework values', () => {
     const cwd = tmpApp({ 'package.json': '{}' });
     expect(() => base(cwd, { IN_WD: '../elsewhere' })).toThrow(/inside the repository/);

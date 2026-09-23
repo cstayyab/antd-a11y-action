@@ -5,10 +5,13 @@ const baseURL = process.env.A11Y_BASE_URL ?? "http://localhost:3100";
 const url = new URL(baseURL);
 const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
 const command = process.env.A11Y_DEV_CMD;
+const storageState = process.env.A11Y_STORAGE_STATE || undefined;
+// With a setup module, it runs once (signing in) and every route reuses the session it saved.
+const setup = process.env.A11Y_SETUP;
+const authState = process.env.A11Y_AUTH_STATE;
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "a11y.spec.ts",
   workers: 1, // the dev server compiles routes on demand; parallel hits only slow it down
   retries: 0,
   reporter: [["list"]],
@@ -16,9 +19,15 @@ export default defineConfig({
   outputDir: process.env.A11Y_OUT ? path.join(path.dirname(process.env.A11Y_OUT), "playwright") : undefined,
   use: {
     baseURL,
-    storageState: process.env.A11Y_STORAGE_STATE || undefined,
     ...(process.env.A11Y_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.A11Y_CHROMIUM_PATH } } : {}),
   },
+  projects:
+    setup && authState
+      ? [
+          { name: "setup", testMatch: "setup.spec.ts", use: { storageState } },
+          { name: "crawl", testMatch: "a11y.spec.ts", dependencies: ["setup"], use: { storageState: authState } },
+        ]
+      : [{ name: "crawl", testMatch: "a11y.spec.ts", use: { storageState } }],
   // No command means the app is already running at target-url.
   webServer: command
     ? {

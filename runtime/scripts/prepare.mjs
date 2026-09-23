@@ -65,6 +65,10 @@ export function resolveConfig(env, cwdExists = fs.existsSync) {
       A11Y_BASE_URL: baseUrl,
       A11Y_STORAGE_STATE: rel(env.IN_STORAGE),
       A11Y_INTERACTIONS: rel(env.IN_INTERACTIONS),
+      A11Y_SETUP: rel(env.IN_SETUP),
+      // Outside results/: the saved session holds cookies and must never land in the artifact.
+      A11Y_AUTH_STATE: env.IN_SETUP ? path.join(out, "auth-state.json") : "",
+      A11Y_SETUP_STATUS: env.IN_SETUP ? path.join(out, "setup-status.json") : "",
       A11Y_NEXT_VERSION: nextVersion ?? "",
       A11Y_REACT_VERSION: reactVersion ?? "",
     },
@@ -76,6 +80,8 @@ function main() {
   for (const w of warnings) console.log(`::warning::a11y runtime: ${w}`);
   // Start clean so a second run in the same job doesn't report the first run's pages.
   fs.rmSync(vars.A11Y_OUT, { recursive: true, force: true });
+  for (const file of [vars.A11Y_AUTH_STATE, vars.A11Y_SETUP_STATUS]) if (file) fs.rmSync(file, { force: true });
+  if (vars.A11Y_SETUP && !fs.existsSync(vars.A11Y_SETUP)) throw new Error(`setup module ${vars.A11Y_SETUP} does not exist.`);
   fs.mkdirSync(vars.A11Y_OUT, { recursive: true });
   exportEnv(vars);
   console.log(`a11y runtime: ${vars.A11Y_MODE} mode in ${vars.A11Y_CWD} (${vars.A11Y_BASE_URL})`);

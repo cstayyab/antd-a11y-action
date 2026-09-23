@@ -10,6 +10,7 @@ const OUT = process.env.A11Y_OUT!;
 const CWD = process.env.A11Y_CWD!;
 const TAGS = (process.env.IN_TAGS || "wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa").split(",").map((t) => t.trim());
 const slug = (r: string) => (r === "/" ? "root" : r.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, ""));
+const samePath = (a: string, b: string) => a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
 
 interface GuardViolation {
   rule: string;
@@ -28,6 +29,9 @@ for (const route of routes) {
 
     const res = await page.goto(route, { waitUntil: "load", timeout: 200_000 });
     await page.waitForLoadState("networkidle").catch(() => {});
+    // A different path after load usually means the session was missing or rejected (/login).
+    const landed = new URL(page.url());
+    const redirectedTo = samePath(landed.pathname, new URL(route, landed).pathname) ? null : landed.pathname;
 
     if (process.env.A11Y_INTERACTIONS) {
       const mod = await import(pathToFileURL(process.env.A11Y_INTERACTIONS).href);
@@ -67,6 +71,7 @@ for (const route of routes) {
         {
           route,
           status: res?.status() ?? null,
+          redirectedTo,
           guard,
           runtime: unique,
           axe: axe.violations.map((v) => ({

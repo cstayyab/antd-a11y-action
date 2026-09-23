@@ -43,6 +43,15 @@ inputs:
   interactions:
     description: ESM module (relative to working-directory) exporting `default async ({ page, route }) => {}` to open modals, dropdowns, tabs.
     default: ''
+  setup:
+    description: >-
+      ESM module (relative to working-directory) exporting `default async ({ page, baseURL }) => {}`. It runs once after
+      the app starts and before any route, typically to sign in; the session it leaves in the browser is reused for every
+      route. Secrets reach it through env on the step.
+    default: ''
+  fail-on-redirect:
+    description: Fail when a route ends up on a different path, e.g. a signed-in page redirecting to /login.
+    default: 'false'
   wcag-tags:
     description: axe-core tags to run.
     default: wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa
@@ -84,6 +93,9 @@ outputs:
   guard-active:
     description: Whether the Next.js guard intercepted renders.
     value: ${{ steps.report.outputs.guard-active }}
+  redirects:
+    description: Number of routes that ended up on a different path.
+    value: ${{ steps.report.outputs.redirects }}
   sarif-file:
     description: Absolute path of the SARIF report.
     value: ${{ steps.report.outputs.sarif-file }}
@@ -102,6 +114,7 @@ runs:
         IN_PORT: ${{ inputs.port }}
         IN_STORAGE: ${{ inputs.storage-state }}
         IN_INTERACTIONS: ${{ inputs.interactions }}
+        IN_SETUP: ${{ inputs.setup }}
       run: node "$GITHUB_ACTION_PATH/scripts/prepare.mjs"
 
     - name: a11y · install runner dependencies
@@ -151,6 +164,7 @@ runs:
       env:
         IN_FAIL_ON: ${{ inputs.fail-on }}
         IN_REQUIRE_GUARD: ${{ inputs.require-guard }}
+        IN_FAIL_ON_REDIRECT: ${{ inputs.fail-on-redirect }}
         IN_COMMENT: ${{ inputs.comment }}
         IN_TOKEN: ${{ inputs.github-token }}
         IN_SARIF_FILE: ${{ inputs.sarif-file }}

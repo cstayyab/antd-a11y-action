@@ -80,6 +80,8 @@ jobs:
         with:
           working-directory: fixtures/next-app
           framework: next
+          setup: a11y/setup.mjs
+          fail-on-redirect: 'true'
           artifact-name: antd-a11y-runtime-next-${{ matrix.next }}
           comment: ${{ matrix.next == '15.5' && github.event.pull_request.head.repo.full_name == github.repository }}
 
@@ -88,11 +90,14 @@ jobs:
           OUTCOME: ${{ steps.runtime.outcome }}
           GUARD: ${{ steps.runtime.outputs.guard-active }}
           BLOCKING: ${{ steps.runtime.outputs.blocking }}
+          REDIRECTS: ${{ steps.runtime.outputs.redirects }}
         run: |
-          echo "outcome=$OUTCOME guard-active=$GUARD blocking=$BLOCKING"
+          echo "outcome=$OUTCOME guard-active=$GUARD blocking=$BLOCKING redirects=$REDIRECTS"
           test "$OUTCOME" = "failure"
           test "$GUARD" = "true"
           test "$BLOCKING" -gt 0
+          # setup signed in, so the signed-in page was crawled rather than redirected to /login.
+          test "$REDIRECTS" = "0"
           # The guard must blame each issue on its own line in app/bad/page.tsx.
           node -e '
             const r = require(process.env.A11Y_OUT + "/bad.json");
@@ -104,6 +109,11 @@ jobs:
                 console.error(`${rule}: expected app/bad/page.tsx:${line}, got ${JSON.stringify(loc)}`);
                 process.exit(1);
               }
+            }
+            const account = require(process.env.A11Y_OUT + "/account.json").runtime.find((v) => v.rule === "accessible-name");
+            if (account?.location?.file !== "app/account/panel.tsx" || account.location.line !== 7) {
+              console.error(`signed-in page: expected app/account/panel.tsx:7, got ${JSON.stringify(account?.location)}`);
+              process.exit(1);
             }
             for (const clean of ["root", "grouped"]) {
               const page = require(process.env.A11Y_OUT + "/" + clean + ".json");

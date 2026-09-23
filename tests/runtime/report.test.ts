@@ -40,6 +40,14 @@ const pages: PageResult[] = [
     ],
   },
   { route: '/broken', status: 500, guard: null, runtime: [], axe: [] },
+  {
+    route: '/account',
+    status: 200,
+    redirectedTo: '/login',
+    guard,
+    runtime: [],
+    axe: [{ id: 'target-size', impact: 'serious', help: 'Touch targets must be large enough', targets: ['.ant-input-password-icon'] }],
+  },
 ];
 
 describe('buildRuntimeResult', () => {
@@ -83,9 +91,14 @@ describe('buildRuntimeResult', () => {
 
   it('tracks guard activity, routes and error pages', () => {
     expect(result.guardActive).toBe(true);
-    expect(result.routes).toEqual(['/bad', '/broken', '/other']);
+    expect(result.routes).toEqual(['/account', '/bad', '/broken', '/other']);
     expect(result.failedRoutes).toEqual(['/broken']);
     expect(buildRuntimeResult([{ ...pages[2] }], opts).guardActive).toBe(false);
+  });
+
+  it('records redirects and labels their findings with where the page landed', () => {
+    expect(result.redirects).toEqual([{ route: '/account', to: '/login' }]);
+    expect(byId('axe/target-size')[0].routes).toEqual(['/account → /login']);
   });
 
   it('never blocks with fail-on none', () => {
