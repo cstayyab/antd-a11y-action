@@ -21,6 +21,9 @@ const pages: PageResult[] = [
       { rule: 'click-events-need-role', message: '<div onClick> without an interactive role', origin: 'app', location: { file: 'app/bad/page.tsx', line: 11, column: 7 } },
       { rule: 'click-events-need-role', message: '<div onClick> without an interactive role', origin: 'library', location: { file: 'app/bad/page.tsx', line: 13, column: 7 } },
       { rule: 'image-alt', message: '<img> missing alt', site: 'at Foo (chunk.js:1:1)', origin: null, location: null },
+      { rule: 'frame-title', message: '<iframe> missing title', origin: 'app', location: { file: 'app/embed.tsx' } },
+      { rule: 'click-events-need-role', message: '<div onClick> without an interactive role', origin: 'app', location: { file: 'app/embed.tsx' } },
+      { rule: 'click-events-need-role', message: '<div onClick> without an interactive role', origin: 'library', location: { file: 'app/embed.tsx' } },
     ],
     axe: [{ id: 'image-alt', impact: 'critical', help: 'Images must have alternative text', helpUrl: 'https://x/image-alt', targets: ['img'] }],
   },
@@ -51,7 +54,7 @@ describe('buildRuntimeResult', () => {
   });
 
   it('downgrades authoring rules on library-internal elements to minor', () => {
-    const clicks = byId('runtime/click-events-need-role');
+    const clicks = byId('runtime/click-events-need-role').filter((f) => f.file?.endsWith('page.tsx'));
     expect(clicks.map((f) => [f.line, f.impact, f.blocking])).toEqual([
       [11, 'serious', true],
       [13, 'minor', false],
@@ -62,6 +65,20 @@ describe('buildRuntimeResult', () => {
   it('keeps unresolved guard findings with their callsite, and axe findings without impact as moderate', () => {
     expect(byId('runtime/image-alt')[0]).toMatchObject({ file: undefined, target: 'at Foo (chunk.js:1:1)' });
     expect(byId('axe/region')[0]).toMatchObject({ impact: 'moderate', blocking: false, target: 'body > div' });
+  });
+
+  it('keeps file-only locations (webpack) out of SARIF but in the comment', () => {
+    const frame = byId('runtime/frame-title')[0];
+    expect(frame).toMatchObject({ file: 'apps/web/app/embed.tsx', line: undefined });
+    const md = renderMarkdown(result, { failOn: 'serious', scope: 'x', marker: RUNTIME_MARKER, blobBase: 'https://g/o/r/blob/s' });
+    expect(md).toContain('[apps/web/app/embed.tsx](https://g/o/r/blob/s/apps/web/app/embed.tsx)');
+    const uris = toSarif(result, 'serious', '0').runs[0].results.map((r) => r.locations[0].physicalLocation.artifactLocation.uri);
+    expect(uris).not.toContain('apps/web/app/embed.tsx');
+  });
+
+  it('keeps app and library findings apart when only the file is known', () => {
+    const inEmbed = byId('runtime/click-events-need-role').filter((f) => f.file === 'apps/web/app/embed.tsx');
+    expect(inEmbed.map((f) => f.impact).sort()).toEqual(['minor', 'serious']);
   });
 
   it('tracks guard activity, routes and error pages', () => {

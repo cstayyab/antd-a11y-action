@@ -54,14 +54,17 @@ function main() {
   // Inside the project root so the bundler compiles it like app code.
   const guardDir = path.join(cwd, ".a11y-guard", "next-a11y");
   fs.cpSync(path.join(actionPath, "guard"), guardDir, { recursive: true });
-  execFileSync(
-    "npm",
-    [
-      "install", "--no-save", "--no-package-lock", "--legacy-peer-deps", "--no-audit", "--no-fund",
-      "axe-core@^4.10", "dom-accessibility-api@^0.7",
-    ],
-    { cwd: guardDir, stdio: "inherit" },
-  );
+  // The guard's own dependencies are regular dependencies; react and next are peers and
+  // --legacy-peer-deps keeps npm from installing a second copy next to the guard.
+  execFileSync("npm", ["install", "--no-package-lock", "--legacy-peer-deps", "--no-audit", "--no-fund"], {
+    cwd: guardDir,
+    stdio: "inherit",
+  });
+  for (const dep of ["axe-core", "dom-accessibility-api"]) {
+    if (!fs.existsSync(path.join(guardDir, "node_modules", dep, "package.json"))) {
+      throw new Error(`guard dependency ${dep} did not install into ${guardDir}/node_modules`);
+    }
+  }
   const target = writeInstrumentation(cwd, guardDir);
   console.log(`a11y runtime: injected guard into ${path.relative(cwd, target)}`);
 }

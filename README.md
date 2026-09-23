@@ -152,7 +152,7 @@ export default async function ({ page, route }) {
 
 - The check runs the pull request's code with a dev server. Use it on `pull_request`, never on `pull_request_target`.
 - In Next mode the guard is written into the working tree. If a later step in the **same job** builds or deploys the app, it would pick it up: keep the check in its own job, or run `git checkout -- . && git clean -fdx -- .a11y-guard '*instrumentation-client*'` in the app directory after it.
-- Guard requirements: Next 15.3+ (for `instrumentation-client`) and React 19.1+ (for `captureOwnerStack`; older React still works, without source lines). Verified on Next 15.5; Next 16 logs a warning until verified.
+- Guard requirements: Next 15.3+ (for `instrumentation-client`) and React 19.1+ (for `captureOwnerStack`; older React still works, without source lines). Verified on Next 15.5 and 16.3 (CI runs both); Next 17+ logs a warning until verified.
 - Server Components never render in the browser, so only axe sees them (no source line).
 - A library's own markup choices (for example antd's modal mask closing on click) are reported as minor, since app code can't change them.
 
@@ -160,7 +160,7 @@ export default async function ({ page, route }) {
 | --- | --- |
 | Route times out | Lower `max-routes` or raise the job's `timeout-minutes`; the first hit compiles the route |
 | Everything redirects to login | Create a `storageState` in an earlier step and pass `storage-state` |
-| `next dev --turbopack` fails | Set `start-command: npx next dev -p 3100` to use webpack |
+| `next dev --turbopack` fails | Set `start-command: npx next dev --webpack -p 3100` (Next 16) or `npx next dev -p 3100` (Next 15) to use webpack |
 | "Guard did not intercept any renders" | Check the inject step log; `instrumentation-client` must sit where Next expects it (root, or `src/`) |
 | Comment step skipped on fork PRs | Expected: forks get a read-only token. The job summary and artifact still have everything |
 

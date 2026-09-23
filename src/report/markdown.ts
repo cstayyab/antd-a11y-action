@@ -63,8 +63,9 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
     for (const f of shown) {
       let where: string;
       if (f.file) {
-        const loc = `${f.file}:${f.line ?? 1}`;
-        where = ctx.blobBase ? `[${escapeCell(loc)}](${ctx.blobBase}/${encodeURI(f.file)}#L${f.line ?? 1})` : `\`${loc}\``;
+        const loc = f.line ? `${f.file}:${f.line}` : f.file;
+        const anchor = f.line ? `#L${f.line}` : '';
+        where = ctx.blobBase ? `[${escapeCell(loc)}](${ctx.blobBase}/${encodeURI(f.file)}${anchor})` : `\`${loc}\``;
       } else {
         where = f.target ? `\`${escapeCell(f.target)}\`` : 'unknown';
       }

@@ -23,7 +23,7 @@ export interface PageResult {
     message: string;
     site?: string;
     selector?: string;
-    location?: { file: string; line: number; column: number } | null;
+    location?: { file: string; line?: number; column?: number } | null;
     /** app: the element is written in app code. library: rendered inside a library component used at `location`. */
     origin?: 'app' | 'library' | null;
   }[];
@@ -93,7 +93,9 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
       const file = v.location
         ? path.relative(opts.workspace, path.join(opts.cwd, v.location.file)).split(path.sep).join('/')
         : undefined;
-      const key = `${info.id}|${file ?? v.site ?? v.selector ?? v.message}|${v.location?.line ?? ''}`;
+      // Origin is part of the key: with file-only (webpack) locations, an app element and a
+      // library-internal one in the same file must stay separate findings.
+      const key = `${info.id}|${v.origin ?? ''}|${file ?? v.site ?? v.selector ?? v.message}|${v.location?.line ?? ''}`;
       add(key, page.route, () => ({
         file,
         line: v.location?.line,

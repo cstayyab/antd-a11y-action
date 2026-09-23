@@ -49,8 +49,14 @@ jobs:
 
   # Runtime sub-action against fixtures/next-app (Next 15.5, React 19, antd 6).
   runtime-next:
+    name: runtime-next (next ${{ matrix.next }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # The fixture's lockfile pins 15.5; the 16 leg upgrades next in place.
+        next: ['15.5', '16']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -60,6 +66,12 @@ jobs:
           cache-dependency-path: fixtures/next-app/package-lock.json
       - run: npm ci
         working-directory: fixtures/next-app
+      - name: Use next ${{ matrix.next }}
+        if: matrix.next != '15.5'
+        working-directory: fixtures/next-app
+        env:
+          NEXT_RANGE: ${{ matrix.next }}
+        run: npm install --no-save --no-audit --no-fund "next@^$NEXT_RANGE"
 
       - name: Run the runtime check (Next mode)
         id: runtime
@@ -68,8 +80,8 @@ jobs:
         with:
           working-directory: fixtures/next-app
           framework: next
-          artifact-name: antd-a11y-runtime-next
-          comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          artifact-name: antd-a11y-runtime-next-${{ matrix.next }}
+          comment: ${{ matrix.next == '15.5' && github.event.pull_request.head.repo.full_name == github.repository }}
 
       - name: Check the results
         env:
@@ -85,7 +97,7 @@ jobs:
           node -e '
             const r = require(process.env.A11Y_OUT + "/bad.json");
             const at = (rule, origin) => r.runtime.find((v) => v.rule === rule && v.origin === origin)?.location;
-            const expect = [["accessible-name", "library", 10], ["click-events-need-role", "app", 11], ["image-alt", "app", 12]];
+            const expect = [["accessible-name", "library", 14], ["click-events-need-role", "app", 15], ["image-alt", "app", 16]];
             for (const [rule, origin, line] of expect) {
               const loc = at(rule, origin);
               if (!loc || loc.file !== "app/bad/page.tsx" || loc.line !== line) {

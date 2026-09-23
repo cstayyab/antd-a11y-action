@@ -6,7 +6,7 @@ import { writeInstrumentation } from '../../runtime/scripts/inject-next.mjs';
 import { atLeast, lines } from '../../runtime/scripts/lib.mjs';
 import { resolveConfig } from '../../runtime/scripts/prepare.mjs';
 import { buildRoutes, discoverNextRoutes } from '../../runtime/scripts/routes.mjs';
-import { normalizeSource } from '../../runtime/resolve';
+import { normalizeSource, resolveStack } from '../../runtime/resolve';
 
 function tmpApp(files: Record<string, string>): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'a11y-app-'));
@@ -49,8 +49,11 @@ describe('prepare', () => {
     expect(oldWithCmd.vars.A11Y_MODE).toBe('generic');
     expect(oldWithCmd.warnings[0]).toMatch(/instrumentation-client/);
 
-    const next16 = tmpApp({ 'node_modules/next/package.json': pkg('16.3.6'), 'node_modules/react/package.json': pkg('19.0.0') });
-    const { warnings } = base(next16);
+    const next16 = tmpApp({ 'node_modules/next/package.json': pkg('16.3.6'), 'node_modules/react/package.json': pkg('19.3.0') });
+    expect(base(next16)).toMatchObject({ vars: { A11Y_MODE: 'next' }, warnings: [] });
+
+    const next17 = tmpApp({ 'node_modules/next/package.json': pkg('17.0.0'), 'node_modules/react/package.json': pkg('19.0.0') });
+    const { warnings } = base(next17);
     expect(warnings.join(' ')).toMatch(/untested/);
     expect(warnings.join(' ')).toMatch(/captureOwnerStack/);
   });
@@ -141,5 +144,15 @@ describe('resolve', () => {
     expect(normalizeSource('webpack://_N_E/./app/x.tsx?1234', cwd)).toBe('app/x.tsx');
     expect(normalizeSource('file:///repo/apps/web/src/app/page.tsx', cwd)).toBe('src/app/page.tsx');
     expect(normalizeSource('/repo/apps/web/app/%5Bid%5D/page.tsx', cwd)).toBe('app/[id]/page.tsx');
+  });
+
+  it('gives file-level blame for webpack dev frames, skipping the guard and node_modules', async () => {
+    const stack = [
+      'at jsx (webpack-internal:///(app-pages-browser)/./.a11y-guard/next-a11y/src/client.js:54:125)',
+      'at Button (webpack-internal:///(app-pages-browser)/./node_modules/antd/es/button/button.js:10:1)',
+      'at Bad (webpack-internal:///(app-pages-browser)/./app/bad/page.tsx:31:88)',
+    ].join('\n');
+    expect(await resolveStack(stack, '/repo/apps/web')).toEqual({ file: 'app/bad/page.tsx' });
+    expect(await resolveStack('at x (webpack-internal:///./node_modules/a.js:1:1)', '/repo')).toBeNull();
   });
 });

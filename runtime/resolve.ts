@@ -33,13 +33,25 @@ export function normalizeSource(source: string, cwd: string): string {
 
 export interface SourceLocation {
   file: string;
-  line: number;
-  column: number;
+  /** Absent when only the file is known (webpack dev builds). */
+  line?: number;
+  column?: number;
 }
+
+// webpack dev (eval-source-map): webpack-internal:///(app-pages-browser)/./app/x.tsx:31:88.
+// The path is exact, but the position is in compiled code and the map is inline in an eval,
+// so only the file is reported.
+const WEBPACK_FRAME = /webpack-internal:\/\/\/(?:\([^)]*\)\/)?\.\/([^\s)]+?):\d+:\d+/;
 
 /** The first frame that maps to the app's own code wins. */
 export async function resolveStack(stack: string | undefined, cwd: string): Promise<SourceLocation | null> {
   for (const frame of (stack ?? "").split("\n")) {
+    const wp = frame.match(WEBPACK_FRAME);
+    if (wp) {
+      const file = normalizeSource(wp[1], cwd);
+      if (IGNORE.test(file) || file.startsWith("../")) continue;
+      return { file };
+    }
     const m = frame.match(/(https?:\/\/[^\s)]+?):(\d+):(\d+)/);
     if (!m) continue;
     const c = await consumer(m[1]);

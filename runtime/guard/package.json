@@ -11,8 +11,10 @@
   },
   "peerDependencies": {
     "next": ">=15.3",
-    "react": ">=19.1",
-    "axe-core": ">=4.10",
-    "dom-accessibility-api": ">=0.7"
+    "react": ">=19.1"
+  },
+  "dependencies": {
+    "axe-core": "^4.10.0",
+    "dom-accessibility-api": "^0.7.0"
   }
 }

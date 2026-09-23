@@ -28,8 +28,8 @@ export function resolveConfig(env, cwdExists = fs.existsSync) {
     if (!atLeast(nextVersion, [15, 3])) {
       warnings.push(`next ${nextVersion} has no instrumentation-client (needs 15.3+); running axe only.`);
       mode = "generic";
-    } else if (atLeast(nextVersion, [16, 0])) {
-      warnings.push(`next ${nextVersion} is untested; the guard was verified on Next 15.5.`);
+    } else if (atLeast(nextVersion, [17, 0])) {
+      warnings.push(`next ${nextVersion} is untested; the guard was verified on Next 15.5 and 16.3.`);
     }
   }
   if (mode === "next" && reactVersion && !atLeast(reactVersion, [19, 1])) {
