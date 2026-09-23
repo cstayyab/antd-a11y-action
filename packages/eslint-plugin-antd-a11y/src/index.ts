@@ -13,7 +13,7 @@ import tooltipNoDisabledChild from './rules/tooltip-no-disabled-child.js';
 export type { AntdA11yDocs, Impact } from './utils/create-rule.js';
 
 export const PLUGIN_NAME = 'antd-a11y';
-export const VERSION = '0.1.0';
+export const VERSION = '0.9.0';
 
 export const rules = {
   'icon-button-has-name': iconButtonHasName,

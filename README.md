@@ -4,6 +4,8 @@ A GitHub Action that blocks pull requests adding accessibility problems to React
 
 > Two layers: the **static** action (10 antd rules plus jsx-a11y's recommended set, on changed files) and the **[runtime check](#runtime-check)** sub-action (starts your app, crawls routes with Playwright + axe, and in Next.js apps blames issues on the source line that rendered them). Both report through inline annotations, SARIF for Code Scanning and a sticky PR comment. The theme contrast layer is next; see [Roadmap](#roadmap).
 
+> **Beta (0.x).** Pin `@v0` to get fixes automatically. Inputs may still change between minor versions until 1.0, which ships once the baseline file and theme audit land; see [Roadmap](#roadmap) and the release notes before upgrading.
+
 ## Quick start
 
 ```yaml
@@ -21,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: cstayyab/antd-a11y-action@v1
+      - uses: cstayyab/antd-a11y-action@v0
         id: a11y
       - uses: github/codeql-action/upload-sarif@v3
         if: always() && steps.a11y.outputs.sarif-file != ''
@@ -90,7 +92,7 @@ The static rules read your source. The runtime check starts the app and looks at
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - uses: cstayyab/antd-a11y-action/runtime@v1
+      - uses: cstayyab/antd-a11y-action/runtime@v0
         id: runtime
         env:
           NEXT_PUBLIC_API_URL: https://staging.example.com   # anything the app needs at dev time
@@ -142,7 +144,7 @@ export default async function ({ page }) {
 ```
 
 ```yaml
-      - uses: cstayyab/antd-a11y-action/runtime@v1
+      - uses: cstayyab/antd-a11y-action/runtime@v0
         env:
           A11Y_USER: ${{ secrets.A11Y_USER }}
           A11Y_PASS: ${{ secrets.A11Y_PASS }}

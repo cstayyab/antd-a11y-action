@@ -57,7 +57,7 @@ export function readInputs(): Inputs {
   }
   for (const mode of modes) {
     if (mode === 'runtime') {
-      core.warning('mode "runtime" runs as its own step: add `uses: cstayyab/antd-a11y-action/runtime@v1`. This step runs "static" only.');
+      core.warning('mode "runtime" runs as its own step: add `uses: cstayyab/antd-a11y-action/runtime@v0`. This step runs "static" only.');
     } else if (mode !== 'static') {
       core.warning(`mode "${mode}" is not available yet in this release and will be skipped. Only "static" runs.`);
     }
