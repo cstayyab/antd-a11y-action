@@ -1,0 +1,46 @@
+# Runs the action from this checkout against fixtures/app, which deliberately
+# breaks every rule, and checks the action fails with the expected counts.
+name: Self-test
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  self-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run antd A11y Guard on fixtures/app
+        id: guard
+        uses: ./
+        continue-on-error: true
+        with:
+          working-directory: fixtures/app
+          changed-only: false
+          comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+
+      - name: Check the results
+        env:
+          OUTCOME: ${{ steps.guard.outcome }}
+          VIOLATIONS: ${{ steps.guard.outputs.violations }}
+          BLOCKING: ${{ steps.guard.outputs.blocking-violations }}
+        run: |
+          echo "outcome=$OUTCOME violations=$VIOLATIONS blocking=$BLOCKING"
+          test "$OUTCOME" = "failure"
+          test "$VIOLATIONS" = "14"
+          test "$BLOCKING" = "10"
+
+      - name: Upload SARIF to code scanning
+        if: always() && steps.guard.outputs.sarif-file != ''
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: ${{ steps.guard.outputs.sarif-file }}
+          category: antd-a11y-self-test

@@ -1,0 +1,68 @@
+name: antd A11y Guard
+description: Block pull requests that introduce accessibility violations in React + Ant Design apps.
+author: cstayyab
+branding:
+  icon: eye
+  color: blue
+
+inputs:
+  mode:
+    description: >-
+      Comma-separated layers to run: static, theme, runtime.
+      This release runs "static" only; the others log a warning and are skipped.
+    default: static
+  fail-on:
+    description: Lowest impact that fails the check (minor | moderate | serious | critical).
+    default: serious
+  changed-only:
+    description: On pull_request events, scan only files the PR adds or modifies.
+    default: 'true'
+  include:
+    description: Globs (comma or newline separated) relative to working-directory.
+    default: '**/*.{js,jsx,ts,tsx}'
+  exclude:
+    description: Globs to skip, relative to working-directory. node_modules, dist and build are always skipped.
+    default: ''
+  working-directory:
+    description: Directory to scan, relative to the repository root.
+    default: .
+  jsx-a11y:
+    description: Also run eslint-plugin-jsx-a11y's recommended rules for plain JSX elements.
+    default: 'true'
+  comment:
+    description: Post or update one sticky PR comment with the results.
+    default: 'true'
+  sarif-file:
+    description: Where to write the SARIF report, relative to the repository root.
+    default: antd-a11y.sarif
+  max-annotations:
+    description: Maximum number of inline annotations to emit.
+    default: '50'
+  github-token:
+    description: Token used to list PR files and write the PR comment.
+    default: ${{ github.token }}
+  # Reserved for the runtime (Playwright + axe) and baseline layers; ignored in this release.
+  baseline:
+    description: Reserved. Path to a baseline file of known violations.
+    required: false
+  start-command:
+    description: Reserved. Command that starts the app for runtime scans.
+    required: false
+  target-url:
+    description: Reserved. Base URL of the running app for runtime scans.
+    required: false
+  routes:
+    description: Reserved. JSON file listing routes to scan at runtime.
+    required: false
+
+outputs:
+  violations:
+    description: Total number of findings.
+  blocking-violations:
+    description: Findings at or above fail-on.
+  sarif-file:
+    description: Absolute path of the SARIF report.
+
+runs:
+  using: node24
+  main: dist/index.mjs

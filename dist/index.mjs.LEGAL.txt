@@ -1,0 +1,110 @@
+Bundled license information:
+
+undici/lib/web/fetch/body.js:
+  /*! formdata-polyfill. MIT License. Jimmy Wärting <https://jimmy.warting.se/opensource> */
+
+undici/lib/web/websocket/frame.js:
+  /*! ws. MIT License. Einar Otto Stangvik <einaros@gmail.com> */
+
+natural-compare/index.js:
+  /*
+   * @version    1.4.0
+   * @date       2015-10-26
+   * @stability  3 - Stable
+   * @author     Lauri Rooden (https://github.com/litejs/natural-compare-lite)
+   * @license    MIT License
+   */
+
+is-extglob/index.js:
+  /*!
+   * is-extglob <https://github.com/jonschlinkert/is-extglob>
+   *
+   * Copyright (c) 2014-2016, Jon Schlinkert.
+   * Licensed under the MIT License.
+   */
+
+is-glob/index.js:
+  /*!
+   * is-glob <https://github.com/jonschlinkert/is-glob>
+   *
+   * Copyright (c) 2014-2017, Jon Schlinkert.
+   * Released under the MIT License.
+   */
+
+imurmurhash/imurmurhash.js:
+  /**
+   * @preserve
+   * JS Implementation of incremental MurmurHash3 (r150) (as of May 10, 2013)
+   *
+   * @author <a href="mailto:jensyt@gmail.com">Jens Taylor</a>
+   * @see http://github.com/homebrewing/brauhaus-diff
+   * @author <a href="mailto:gary.court@gmail.com">Gary Court</a>
+   * @see http://github.com/garycourt/murmurhash-js
+   * @author <a href="mailto:aappleby@gmail.com">Austin Appleby</a>
+   * @see http://sites.google.com/site/murmurhash/
+   */
+
+uri-js/dist/es5/uri.all.js:
+  /** @license URI.js v4.4.1 (c) 2011 Gary Court. License: http://github.com/garycourt/uri-js */
+
+typescript/lib/typescript.js:
+typescript/lib/tsserverlibrary.js:
+  /*! *****************************************************************************
+  Copyright (c) Microsoft Corporation. All rights reserved.
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+  this file except in compliance with the License. You may obtain a copy of the
+  License at http://www.apache.org/licenses/LICENSE-2.0
+  
+  THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
+  WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+  MERCHANTABLITY OR NON-INFRINGEMENT.
+  
+  See the Apache Version 2.0 License for specific language governing permissions
+  and limitations under the License.
+  ***************************************************************************** */
+
+axe-core/axe.js:
+  /*! axe v4.13.0
+   * Copyright (c) 2015 - 2026 Deque Systems, Inc.
+   *
+   * Your use of this Source Code Form is subject to the terms of the Mozilla Public
+   * License, v. 2.0. If a copy of the MPL was not distributed with this
+   * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+   *
+   * This entire copyright notice must appear in every copy of this file you
+   * distribute or in any file that contains substantial portions of this source
+   * code.
+   */
+
+string.prototype.includes/implementation.js:
+string.prototype.includes/polyfill.js:
+string.prototype.includes/shim.js:
+string.prototype.includes/index.js:
+  /*! https://mths.be/includes v2.0.0 by @mathias */
+
+language-tags/lib/Subtag.js:
+language-tags/lib/Tag.js:
+language-tags/lib/index.js:
+  /**
+   * @author Matthew Caruana Galizia <mattcg@gmail.com>
+   * @license MIT: http://mattcg.mit-license.org/
+   * @copyright Copyright (c) 2013, Matthew Caruana Galizia
+   */
+
+content-type/dist/index.js:
+  /*!
+   * content-type
+   * Copyright(c) 2015 Douglas Christopher Wilson
+   * MIT Licensed
+   */
+
+@octokit/request-error/dist-src/index.js:
+  /* v8 ignore else -- @preserve -- Bug with vitest coverage where it sees an else branch that doesn't exist */
+
+@octokit/request/dist-bundle/index.js:
+  /* v8 ignore next -- @preserve */
+  /* v8 ignore else -- @preserve */
+
+@octokit/graphql/dist-bundle/index.js:
+  /* v8 ignore if -- @preserve */

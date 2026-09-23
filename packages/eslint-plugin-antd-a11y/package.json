@@ -1,0 +1,44 @@
+{
+  "name": "eslint-plugin-antd-a11y",
+  "version": "0.1.0",
+  "description": "ESLint rules for accessibility issues specific to Ant Design components",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "antd",
+    "ant-design",
+    "a11y",
+    "accessibility",
+    "wcag"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cstayyab/antd-a11y-action.git",
+    "directory": "packages/eslint-plugin-antd-a11y"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@typescript-eslint/utils": "^8.70.1"
+  },
+  "peerDependencies": {
+    "eslint": "^8.57.0 || ^9.0.0"
+  },
+  "engines": {
+    "node": ">=18.18"
+  }
+}

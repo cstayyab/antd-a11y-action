@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "eslint-plugin-antd-a11y": ["./packages/eslint-plugin-antd-a11y/src/index.ts"]
+    }
+  },
+  "include": ["src", "packages/*/src", "packages/*/tests", "tests", "vitest.config.ts"]
+}

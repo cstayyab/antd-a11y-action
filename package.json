@@ -1,0 +1,50 @@
+{
+  "name": "antd-a11y-action",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Action that blocks PRs introducing Ant Design accessibility violations",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:plugin": "npm run build -w eslint-plugin-antd-a11y",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm test"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "@typescript-eslint/parser": "^8.70.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "minimatch": "^10.2.6"
+  },
+  "devDependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "@eslint/js": "^9.39.5",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^22.19.0",
+    "@types/react": "^18.3.26",
+    "@types/react-dom": "^18.3.7",
+    "ajv": "^8.20.0",
+    "ajv-draft-04": "^1.0.0",
+    "antd": "^5.29.3",
+    "axe-core": "^4.13.0",
+    "dom-accessibility-api": "^0.7.1",
+    "esbuild": "^0.28.2",
+    "jsdom": "^27.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.1"
+  }
+}
