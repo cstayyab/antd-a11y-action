@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseAliasesInput, resolveConfig, type ConfigInputs } from '../src/config.js';
+import { configWarnings, parseAliasesInput, resolveConfig, type ConfigInputs } from '../src/config.js';
 import { A11yLinter } from '../src/lint.js';
 import type { ScanResult } from '../src/types.js';
 
@@ -95,7 +95,16 @@ describe('wrapper aliases', () => {
       /\.github\/antd-a11y\.json: aliases\.T\.only: unknown rule "typo"/,
     );
     expect(() => resolveConfig({ ...withFile({ aliases: { T: { as: 'Tooltip', satisfies: { 'popup-trigger-focusable': 'a b' } } } }) })).toThrow(
-      /expected "prop", "!prop" or "prop:string"/,
+      /expected "prop", "!prop", "prop:string" or a list of them/,
     );
+  });
+
+  it('warns about a naming condition given to one naming rule but not its siblings', () => {
+    const file = withFile({ aliases: { TextField: { as: 'Input', satisfies: { 'form-control-has-name': 'label:string' } } } });
+    expect(configWarnings(resolveConfig(file))).toEqual([
+      expect.stringContaining('Alias "TextField" names its control for form-control-has-name but not form-item-has-label'),
+    ]);
+    const fixed = withFile({ aliases: { TextField: { as: 'Input', name: 'label:string' } } });
+    expect(configWarnings(resolveConfig(fixed))).toEqual([]);
   });
 });

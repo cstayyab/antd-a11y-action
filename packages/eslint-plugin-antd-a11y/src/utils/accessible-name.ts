@@ -1,5 +1,6 @@
 import { TSESTree, AST_NODE_TYPES } from '@typescript-eslint/utils';
 import type { AntdResolver } from './antd-imports.js';
+import { wrapperNamesElement } from './aliases.js';
 import { hasMeaningfulProp, hasSpread, meaningfulChildren, parentElement } from './jsx.js';
 
 type Opening = TSESTree.JSXOpeningElement;
@@ -17,6 +18,8 @@ export function hasOwnName(
   { extraProps = [], allowId = true }: { extraProps?: string[]; allowId?: boolean } = {},
 ): boolean {
   if (hasSpread(node)) return true;
+  // An aliased wrapper whose `name` condition holds renders its own label.
+  if (wrapperNamesElement(node)) return true;
   for (const prop of [...NAME_PROPS, ...extraProps]) {
     if (hasMeaningfulProp(node, prop)) return true;
   }

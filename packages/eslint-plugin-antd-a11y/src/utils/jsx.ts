@@ -12,9 +12,30 @@ function attrName(attr: TSESTree.JSXAttribute): string {
     : `${attr.name.namespace.name}:${attr.name.name.name}`;
 }
 
-export function getProp(node: Opening, name: string): TSESTree.JSXAttribute | undefined {
+// Aliased wrappers that forward a prop under another name (`ariaLabel` → `aria-label`). Set by the resolver.
+const forwardedProps = new WeakMap<Opening, Record<string, string>>();
+
+export function setForwardedProps(node: Opening, props: Record<string, string>): void {
+  forwardedProps.set(node, props);
+}
+
+function findProp(node: Opening, name: string): TSESTree.JSXAttribute | undefined {
   for (const attr of node.attributes) {
     if (attr.type === AST_NODE_TYPES.JSXAttribute && attrName(attr) === name) return attr;
+  }
+  return undefined;
+}
+
+/** The attribute `name`, or on an aliased wrapper the prop it forwards as `name`. */
+export function getProp(node: Opening, name: string): TSESTree.JSXAttribute | undefined {
+  const direct = findProp(node, name);
+  if (direct) return direct;
+  const forwarded = forwardedProps.get(node);
+  if (!forwarded) return undefined;
+  for (const [wrapperProp, target] of Object.entries(forwarded)) {
+    if (target !== name) continue;
+    const attr = findProp(node, wrapperProp);
+    if (attr) return attr;
   }
   return undefined;
 }

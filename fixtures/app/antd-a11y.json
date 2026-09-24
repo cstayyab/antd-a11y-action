@@ -6,7 +6,8 @@
     },
     "TextField": {
       "as": "Input",
-      "satisfies": { "form-control-has-name": "label:string" }
+      "name": ["label:string", "ariaLabel"],
+      "props": { "ariaLabel": "aria-label" }
     }
   }
 }

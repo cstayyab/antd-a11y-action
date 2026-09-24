@@ -2,7 +2,7 @@
 // Sources, lowest to highest precedence: built-in defaults < config file (JSON) < action inputs.
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import antdA11y, { aliasErrors, type AliasMap } from 'eslint-plugin-antd-a11y';
+import antdA11y, { aliasErrors, aliasWarnings, type AliasMap } from 'eslint-plugin-antd-a11y';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import type { Linter } from 'eslint';
 import { RUNTIME_RULES } from './runtime/rules.js';
@@ -288,6 +288,7 @@ export function configWarnings(config: ActionConfig): string[] {
   if (antdRules.every((id) => config.rules.get(id)?.severity === 'off')) {
     warnings.push('Every antd-a11y rule is turned off, so the static check only runs jsx-a11y.');
   }
+  warnings.push(...aliasWarnings(config.aliases));
   return warnings;
 }
 

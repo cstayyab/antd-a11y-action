@@ -156,35 +156,55 @@ If your codebase wraps antd components (`HintTooltip` around `Tooltip`, `TextFie
             TextField: Input
 ```
 
-A wrapper often handles some rules itself, sometimes only when it gets a certain prop. Say so per rule in the config file, so those call sites aren't reported:
+A wrapper often handles some rules itself, sometimes only when it gets a certain prop. Describe that in the config file, so those call sites aren't reported:
 
 ```json
 {
   "aliases": {
+    "TextField": {
+      "as": "Input",
+      "name": ["label:string", "ariaLabel"],
+      "props": { "ariaLabel": "aria-label" }
+    },
     "HintTooltip": {
       "as": "Tooltip",
       "satisfies": { "popup-trigger-focusable": "asButton" }
-    },
-    "TextField": {
-      "as": "Input",
-      "satisfies": { "form-control-has-name": "label:string" }
     },
     "UI.Field": { "as": "Form.Item", "except": ["form-item-has-label"] }
   }
 }
 ```
 
-- `satisfies` maps a rule to a condition on the wrapper's props. When the condition holds, that rule is met at that call site:
-  - `prop`: the prop is present and not `false` (`asButton`, `asButton={true}`).
-  - `!prop`: the prop is absent or `false`.
+- `name`: when the wrapper renders its own accessible name. Every rule that asks whether a control is named honours it: `form-control-has-name`, `picker-has-name`, `form-item-has-label` and `icon-button-has-name`. Declare naming here, not per rule. A `Form.Item` without a `label` is reported when its control has no name, so a condition given only to `form-control-has-name` leaves `<Form.Item name="email"><TextField label="Email" /></Form.Item>` reported as unlabelled. The action warns about aliases set up that way.
+- `props`: props the wrapper forwards under another name, such as a camelCase `ariaLabel` passed on as `aria-label`. The rules then read `ariaLabel` wherever they would read `aria-label`.
+- `satisfies`: a condition, per rule, under which the wrapper meets that rule itself. `asButton` above renders a real `<button>` around the trigger, so the trigger can take focus.
+- Conditions read the wrapper's props:
+  - `prop`: the prop is present and not `false` or empty (`asButton`, `asButton={true}`).
+  - `!prop`: the prop is absent, `false` or empty.
   - `prop:string`: the prop is a non-empty string. `label="Email"` meets it; `label={<Trans>Email</Trans>}` doesn't, so that call site is checked like a bare `Input`.
 
-  When the value can't be read statically (a variable, a function call, a spread), the rule stays quiet.
+  A list of conditions holds when any one of them does. When a value can't be read statically (a variable, a function call, a spread), the rule stays quiet.
 - `only` or `except` limit which rules apply to the wrapper at all.
 - Aliases match imported components only. A component defined in the same file with the same name is left alone. On a full scan, an alias that matches no tag logs a warning, so typos surface.
 - Workflow input lines replace the file's entry for that wrapper.
 
 The runtime check sees through wrappers without configuration, but only for what axe and the guard check in the rendered page: missing names on inputs, buttons and images. The tooltip and popup rules (`tooltip-no-disabled-child`, `popup-trigger-focusable`) are static only, so for them an alias is the only way to cover a wrapper.
+
+### What the static rules can't see
+
+The rules read JSX, not the rendered page, so props that a component adds at runtime are invisible to them. A common case: antd's `Dropdown` with `disabled` clones its trigger and sets `disabled` on it. Here the `Button` is unreachable by keyboard in the browser, even though the JSX gives it only `aria-disabled`:
+
+```jsx
+<Tooltip title={atMax ? reason : ''} trigger={['hover', 'focus']}>
+  <span>
+    <Dropdown disabled={atMax} menu={menu}>
+      <Button aria-disabled={atMax}>Add</Button>
+    </Dropdown>
+  </span>
+</Tooltip>
+```
+
+`tooltip-no-disabled-child` can't report this; the site shows up as `popup-trigger-focusable` on the `span` instead. To keep the trigger focusable, control the popup's `open` rather than passing `disabled`. The same applies to any component, antd's or your own, that clones its child and sets props on it.
 
 ## Runtime check
 

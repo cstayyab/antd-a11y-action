@@ -260,6 +260,20 @@ describe('tooltip-no-disabled-child', () => {
   });
 });
 
+// README "What the static rules can't see": Dropdown's disabled reaches the trigger at runtime.
+describe('static limits', () => {
+  it('Dropdown disabled sets disabled on a trigger whose JSX only has aria-disabled', () => {
+    const c = mount(
+      <Dropdown disabled menu={{ items: [{ key: '1', label: 'Rename' }] }}>
+        <Button aria-disabled>Add</Button>
+      </Dropdown>,
+    );
+    const button = c.querySelector('button');
+    expect(button?.disabled).toBe(true);
+    expect(isKeyboardFocusable(button)).toBe(false);
+  });
+});
+
 describe('popup-trigger-focusable', () => {
   it('notFocusable: a span trigger is not keyboard focusable', () => {
     const c = mount(

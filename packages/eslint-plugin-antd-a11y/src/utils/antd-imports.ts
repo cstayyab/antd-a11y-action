@@ -1,5 +1,5 @@
 import { ASTUtils, TSESTree, AST_NODE_TYPES, type TSESLint } from '@typescript-eslint/utils';
-import { aliasTarget, readAliases, type AliasMap } from './aliases.js';
+import { aliasTarget, readAliases, registerAliased, type Alias } from './aliases.js';
 
 type Scope = TSESLint.Scope.Scope;
 type JSXTagName = TSESTree.JSXTagNameExpression;
@@ -161,7 +161,7 @@ export interface AntdResolver {
 
 export function createResolver(context: Readonly<TSESLint.RuleContext<string, readonly unknown[]>>): AntdResolver {
   const cache = new WeakMap<TSESTree.JSXOpeningElement, Binding>();
-  const aliases: AliasMap = readAliases(context.settings);
+  const aliases: Record<string, Alias> = readAliases(context.settings);
   const hasAliases = Object.keys(aliases).length > 0;
   // "antd-a11y/popup-trigger-focusable" in a config, "popup-trigger-focusable" in RuleTester.
   const rule = context.id.split('/').pop() ?? context.id;
@@ -172,6 +172,8 @@ export function createResolver(context: Readonly<TSESLint.RuleContext<string, re
     if (!binding && hasAliases) {
       const name = importedTagName(scope, node.name);
       const spec = name ? aliases[name] : undefined;
+      // Registered whatever this rule decides: forwarded props and `name` describe the wrapper itself.
+      if (spec) registerAliased(node, spec);
       const target = spec ? aliasTarget(spec, rule, node) : null;
       if (target) binding = { kind: 'component', name: target };
     }
