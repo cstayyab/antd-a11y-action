@@ -2,7 +2,7 @@
 // Sources, lowest to highest precedence: built-in defaults < config file (JSON) < action inputs.
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import antdA11y from 'eslint-plugin-antd-a11y';
+import antdA11y, { aliasErrors, type AliasMap } from 'eslint-plugin-antd-a11y';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import type { Linter } from 'eslint';
 import { RUNTIME_RULES } from './runtime/rules.js';
@@ -33,6 +33,8 @@ export interface ActionConfig {
   jsxA11y: Preset;
   rules: Map<string, RuleOverride>;
   settings: JsxA11ySettings;
+  /** In-house wrappers the antd rules check as the antd component they wrap. */
+  aliases: AliasMap;
   /** Repo-relative path of the config file that was applied, if any. */
   file?: string;
 }
@@ -108,6 +110,34 @@ export function parseComponentsInput(value: string | undefined): Record<string, 
   return components;
 }
 
+/** `aliases` input: one "WrapperName: AntdComponent" per line. The per-rule form needs the config file. */
+export function parseAliasesInput(value: string | undefined): AliasMap {
+  const aliases: AliasMap = {};
+  for (const line of lines(value)) {
+    const m = /^([^:\s]+)\s*:\s*(\S+)$/.exec(line);
+    if (!m) throw new ConfigError(`aliases input: expected "WrapperName: AntdComponent", got "${line}".`);
+    checkAliases({ [m[1]]: m[2] }, 'aliases input');
+    aliases[m[1]] = { as: m[2] };
+  }
+  return aliases;
+}
+
+function checkAliases(raw: unknown, where: string): void {
+  const errors = aliasErrors(raw, Object.keys(antdA11y.rules));
+  if (errors.length) throw new ConfigError(`${where}: ${errors.join(' ')}`);
+}
+
+function fileAliases(shape: FileShape, file: string): AliasMap {
+  if (shape.aliases === undefined) return {};
+  checkAliases(shape.aliases, file);
+  return Object.fromEntries(
+    Object.entries(shape.aliases as Record<string, unknown>).map(([name, value]) => [
+      name,
+      typeof value === 'string' ? { as: value } : (value as AliasMap[string]),
+    ]),
+  );
+}
+
 export function parsePreset(value: string | undefined, where = 'jsx-a11y input'): Preset {
   const v = String(value ?? '').trim().toLowerCase();
   if (v === '' || v === 'true' || v === 'recommended') return 'recommended';
@@ -118,6 +148,7 @@ export function parsePreset(value: string | undefined, where = 'jsx-a11y input')
 
 interface FileShape {
   jsxA11y?: unknown;
+  aliases?: unknown;
   rules?: Record<string, unknown>;
   settings?: { components?: unknown; polymorphicPropName?: unknown; attributes?: unknown };
 }
@@ -132,9 +163,9 @@ export function readConfigFile(file: string, label = file): FileShape | null {
     throw new ConfigError(`${label}: not valid JSON (${(error as Error).message}).`);
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new ConfigError(`${label}: expected a JSON object.`);
-  const allowed = new Set(['$schema', 'jsxA11y', 'rules', 'settings']);
+  const allowed = new Set(['$schema', 'jsxA11y', 'rules', 'settings', 'aliases']);
   for (const key of Object.keys(data)) {
-    if (!allowed.has(key)) throw new ConfigError(`${label}: unknown key "${key}" (allowed: jsxA11y, rules, settings).`);
+    if (!allowed.has(key)) throw new ConfigError(`${label}: unknown key "${key}" (allowed: jsxA11y, rules, settings, aliases).`);
   }
   return data as FileShape;
 }
@@ -177,6 +208,7 @@ export interface ConfigInputs {
   jsxA11y?: string;
   rules?: string;
   components?: string;
+  aliases?: string;
   /** Path of the config file relative to the workspace; missing files are fine. */
   configFile?: string;
   workspace: string;
@@ -203,7 +235,9 @@ export function resolveConfig(inputs: ConfigInputs): ActionConfig {
     ...fromFile,
     components: { ...DEFAULT_COMPONENTS, ...fromFile.components, ...parseComponentsInput(inputs.components) },
   };
-  return { jsxA11y: jsx, rules, settings, file: fileLabel };
+  // An input line replaces the file's entry for that wrapper, per-rule settings included.
+  const aliases: AliasMap = { ...(shape ? fileAliases(shape, fileLabel!) : {}), ...parseAliasesInput(inputs.aliases) };
+  return { jsxA11y: jsx, rules, settings, aliases, file: fileLabel };
 }
 
 /** Our tuning of jsx-a11y's presets, from beta feedback (see README "Precision"). */

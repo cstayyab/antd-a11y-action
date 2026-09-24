@@ -55,7 +55,7 @@ Every finding names the WCAG 2.2 success criteria it fails, with level and a lin
 
 Impact uses axe-core's scale, and `fail-on` (default `serious`) decides what blocks the PR. Anything below the threshold still appears as a warning, in SARIF, and in the PR comment.
 
-**Built to stay quiet when unsure.** A rule only reports on components it can trace back to an `antd` import (named, aliased, namespace, `antd/es/*`, or `const { Item } = Form`). Spread props, `id`s and custom children count as "may be labelled". Each rule's claim about antd's markup is also checked in CI by rendering real antd and inspecting the DOM (`packages/eslint-plugin-antd-a11y/tests/dom`).
+**Built to stay quiet when unsure.** A rule only reports on components it can trace back to an `antd` import (named, aliased, namespace, `antd/es/*`, or `const { Item } = Form`). In-house wrappers around antd components are invisible to the rules until you declare them; see [Wrapper components](#wrapper-components). Spread props, `id`s and custom children count as "may be labelled". Each rule's claim about antd's markup is also checked in CI by rendering real antd and inspecting the DOM (`packages/eslint-plugin-antd-a11y/tests/dom`).
 
 **jsx-a11y, tuned.** The jsx-a11y layer runs the recommended set with a few precision changes:
 
@@ -84,6 +84,7 @@ When an antd rule and a jsx-a11y rule flag the same element, only the antd findi
 | `jsx-a11y` | `recommended` | `eslint-plugin-jsx-a11y` preset: `recommended` (tuned, see above), `strict`, or `false`. `true` means `recommended`. |
 | `components` | | Map your own components to the element they render, one `Name: tag` per line (`Icon: svg`, `Link: a`), so jsx-a11y checks them. `FontAwesomeIcon: svg` is built in. antd components need no mapping. |
 | `rules` | | Per-rule severity, one `rule-id: off\|warn\|error` per line. See [Configuration](#configuration). |
+| `aliases` | | In-house wrappers around antd components, one `WrapperName: AntdComponent` per line. See [Wrapper components](#wrapper-components). |
 | `config` | `.github/antd-a11y.json` | JSON config file, used when it exists. See [Configuration](#configuration). |
 | `comment` | `true` | Post and update one sticky PR comment. Clean PRs get no comment. |
 | `sarif-file` | `antd-a11y.sarif` | Where to write the SARIF report |
@@ -142,6 +143,48 @@ Guardrails:
 - An unknown rule id, or options a rule's schema rejects, fails the step. A typo never silently disables a rule.
 - Turning off every antd rule logs a warning.
 - The PR comment footer lists the overrides (e.g. "3 rules overridden (`.github/antd-a11y.json`): 2 off, 1 warn"), so reviewers can see when the gate was loosened.
+
+### Wrapper components
+
+If your codebase wraps antd components (`AccessibleTooltip` around `Tooltip`, `LabelInput` around `Input`), the rules skip the wrappers, because they only trust what they can trace to an `antd` import. Declare the wrappers so the rules check them as the component they wrap:
+
+```yaml
+      - uses: cstayyab/antd-a11y-action@v0
+        with:
+          aliases: |
+            AccessibleTooltip: Tooltip
+            LabelInput: Input
+```
+
+A wrapper often handles some rules itself, sometimes only when it gets a certain prop. Say so per rule in the config file, so those call sites aren't reported:
+
+```json
+{
+  "aliases": {
+    "AccessibleTooltip": {
+      "as": "Tooltip",
+      "satisfies": { "popup-trigger-focusable": "wrapInButton" }
+    },
+    "LabelInput": {
+      "as": "Input",
+      "satisfies": { "form-control-has-name": "label:string" }
+    },
+    "UI.Field": { "as": "Form.Item", "except": ["form-item-has-label"] }
+  }
+}
+```
+
+- `satisfies` maps a rule to a condition on the wrapper's props. When the condition holds, that rule is met at that call site:
+  - `prop`: the prop is present and not `false` (`wrapInButton`, `wrapInButton={true}`).
+  - `!prop`: the prop is absent or `false`.
+  - `prop:string`: the prop is a non-empty string. `label="Email"` meets it; `label={<Trans>Email</Trans>}` doesn't, so that call site is checked like a bare `Input`.
+
+  When the value can't be read statically (a variable, a function call, a spread), the rule stays quiet.
+- `only` or `except` limit which rules apply to the wrapper at all.
+- Aliases match imported components only. A component defined in the same file with the same name is left alone. On a full scan, an alias that matches no tag logs a warning, so typos surface.
+- Workflow input lines replace the file's entry for that wrapper.
+
+The runtime check sees through wrappers without configuration, but only for what axe and the guard check in the rendered page: missing names on inputs, buttons and images. The tooltip and popup rules (`tooltip-no-disabled-child`, `popup-trigger-focusable`) are static only, so for them an alias is the only way to cover a wrapper.
 
 ## Runtime check
 

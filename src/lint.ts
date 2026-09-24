@@ -36,6 +36,7 @@ export function buildConfig(config: ActionConfig): Linter.Config[] {
       // Registered even with the preset off, so a rule a user turns on individually still resolves.
       plugins: { 'antd-a11y': antdA11y, 'jsx-a11y': wrappedJsxA11y } as unknown as Linter.Config['plugins'],
       settings: {
+        'antd-a11y': { aliases: config.aliases },
         'jsx-a11y': {
           components,
           ...(polymorphicPropName ? { polymorphicPropName } : {}),
@@ -95,7 +96,15 @@ export class A11yLinter {
   }
 
   /** Lints one file's source. `file` is the repo-relative path used in reports. */
+  /** Alias names that appear as a JSX tag in at least one scanned file. */
+  readonly usedAliases = new Set<string>();
+
   lintSource(file: string, code: string, result: ScanResult): void {
+    for (const name of Object.keys(this.options.config.aliases)) {
+      if (!this.usedAliases.has(name) && new RegExp(`<${name.replace(/\./g, '\\.')}[\\s/>]`).test(code)) {
+        this.usedAliases.add(name);
+      }
+    }
     const messages = this.linter.verify(code, this.config, { filename: file });
     // Present at runtime since ESLint 8.8, missing from the published types.
     const suppressedMessages = (this.linter as Linter & { getSuppressedMessages(): Linter.LintMessage[] })

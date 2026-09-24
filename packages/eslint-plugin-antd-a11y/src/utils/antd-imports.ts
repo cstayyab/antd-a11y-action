@@ -1,4 +1,5 @@
 import { ASTUtils, TSESTree, AST_NODE_TYPES, type TSESLint } from '@typescript-eslint/utils';
+import { aliasTarget, readAliases, type AliasMap } from './aliases.js';
 
 type Scope = TSESLint.Scope.Scope;
 type JSXTagName = TSESTree.JSXTagNameExpression;
@@ -136,6 +137,21 @@ function resolveTag(scope: Scope, tag: JSXTagName): Binding {
   return null;
 }
 
+/** "AccessibleTooltip" or "UI.Tooltip" for a tag whose root identifier is imported, else null. */
+function importedTagName(scope: Scope, tag: JSXTagName): string | null {
+  const parts: string[] = [];
+  let current: JSXTagName = tag;
+  while (current.type === AST_NODE_TYPES.JSXMemberExpression) {
+    parts.unshift(current.property.name);
+    current = current.object;
+  }
+  if (current.type !== AST_NODE_TYPES.JSXIdentifier || /^[a-z]/.test(current.name)) return null;
+  const variable = ASTUtils.findVariable(scope, current.name);
+  // Only imported components: a local component that happens to share the name is something else.
+  if (!variable || variable.defs.length !== 1 || variable.defs[0].type !== 'ImportBinding') return null;
+  return [current.name, ...parts].join('.');
+}
+
 export interface AntdResolver {
   /** Canonical antd name such as `Button` or `Form.Item`, or null if not from antd. */
   componentName(node: TSESTree.JSXOpeningElement): string | null;
@@ -145,9 +161,20 @@ export interface AntdResolver {
 
 export function createResolver(context: Readonly<TSESLint.RuleContext<string, readonly unknown[]>>): AntdResolver {
   const cache = new WeakMap<TSESTree.JSXOpeningElement, Binding>();
+  const aliases: AliasMap = readAliases(context.settings);
+  const hasAliases = Object.keys(aliases).length > 0;
+  // "antd-a11y/popup-trigger-focusable" in a config, "popup-trigger-focusable" in RuleTester.
+  const rule = context.id.split('/').pop() ?? context.id;
   const lookup = (node: TSESTree.JSXOpeningElement): Binding => {
     if (cache.has(node)) return cache.get(node) ?? null;
-    const binding = resolveTag(context.sourceCode.getScope(node), node.name);
+    const scope = context.sourceCode.getScope(node);
+    let binding = resolveTag(scope, node.name);
+    if (!binding && hasAliases) {
+      const name = importedTagName(scope, node.name);
+      const spec = name ? aliases[name] : undefined;
+      const target = spec ? aliasTarget(spec, rule, node) : null;
+      if (target) binding = { kind: 'component', name: target };
+    }
     cache.set(node, binding);
     return binding;
   };

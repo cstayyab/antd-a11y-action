@@ -44,6 +44,7 @@ export async function run(): Promise<void> {
     jsxA11y: inputs.jsxA11y,
     rules: inputs.rules,
     components: inputs.components,
+    aliases: inputs.aliases,
     configFile: inputs.configFile,
     workspace,
   });
@@ -51,6 +52,14 @@ export async function run(): Promise<void> {
   for (const warning of configWarnings(config)) core.warning(warning);
   const linter = new A11yLinter({ config, failOn: inputs.failOn });
   const result = await linter.lintFiles(workspace, files);
+  const aliasNames = Object.keys(config.aliases);
+  if (aliasNames.length) core.info(`Checking ${aliasNames.length} wrapper ${aliasNames.length === 1 ? 'alias' : 'aliases'}: ${aliasNames.join(', ')}.`);
+  // Only a full scan can tell that an alias is never used; a PR's changed files may simply not include it.
+  if (scope === 'full scan') {
+    for (const name of aliasNames.filter((n) => !linter.usedAliases.has(n))) {
+      core.warning(`Alias "${name}" matched no JSX tag in the scanned files. Check the spelling, and that it is imported where it is used.`);
+    }
+  }
   const blocking = result.findings.filter((f) => f.blocking).length;
 
   annotate(result, inputs.maxAnnotations);

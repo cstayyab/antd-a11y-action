@@ -20,6 +20,26 @@ export default [antdA11y.configs.recommended];
 
 Rules only report on components they can trace to an `antd` import. Each rule's `meta.docs` carries an axe-style `impact` and the WCAG criteria it covers.
 
+In-house wrappers around antd components are skipped unless you declare them in `settings['antd-a11y'].aliases`, either for every rule or per rule, with a prop condition that meets the rule:
+
+```js
+export default [
+  antdA11y.configs.recommended,
+  {
+    settings: {
+      'antd-a11y': {
+        aliases: {
+          LabelInput: 'Input',
+          AccessibleTooltip: { as: 'Tooltip', satisfies: { 'popup-trigger-focusable': 'wrapInButton' } },
+        },
+      },
+    },
+  },
+];
+```
+
+See [Wrapper components](https://github.com/cstayyab/antd-a11y-action#wrapper-components) for `satisfies`, `only` and `except`. `aliasErrors(aliases, ruleNames)` is exported for tools that want to validate the setting.
+
 See the [rule list and docs](https://github.com/cstayyab/antd-a11y-action#what-it-catches). The same rules power the [antd A11y Guard](https://github.com/cstayyab/antd-a11y-action) GitHub Action.
 
 Not affiliated with or endorsed by Ant Group or the Ant Design team.

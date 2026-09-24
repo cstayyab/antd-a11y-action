@@ -23,6 +23,7 @@ export interface Inputs {
   rules: string;
   /** jsx-a11y component mapping lines, "Name: tag". */
   components: string;
+  aliases: string;
   /** JSON config file, relative to the repository root; used only if it exists. */
   configFile: string;
   maxAnnotations: number;
@@ -98,6 +99,7 @@ export function readInputs(): Inputs {
     jsxA11y: core.getInput('jsx-a11y'),
     rules: core.getInput('rules'),
     components: core.getInput('components'),
+    aliases: core.getInput('aliases'),
     configFile: core.getInput('config') || '.github/antd-a11y.json',
     maxAnnotations,
   };

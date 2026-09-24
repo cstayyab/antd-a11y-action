@@ -11,6 +11,7 @@ import tableColumnHasTitle from './rules/table-column-has-title.js';
 import tooltipNoDisabledChild from './rules/tooltip-no-disabled-child.js';
 
 export type { AntdA11yDocs, Impact } from './utils/create-rule.js';
+export { aliasErrors, type AliasMap, type AliasSpec } from './utils/aliases.js';
 
 export const PLUGIN_NAME = 'antd-a11y';
 export const VERSION = '0.9.1';

@@ -1,0 +1,12 @@
+{
+  "aliases": {
+    "AccessibleTooltip": {
+      "as": "Tooltip",
+      "satisfies": { "popup-trigger-focusable": "wrapInButton" }
+    },
+    "LabelInput": {
+      "as": "Input",
+      "satisfies": { "form-control-has-name": "label:string" }
+    }
+  }
+}

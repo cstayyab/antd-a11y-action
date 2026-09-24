@@ -41,8 +41,14 @@ inputs:
       Map wrapper components to the element they render, one "Name: tag" per line, so jsx-a11y checks them
       (e.g. "Icon: svg"). FontAwesomeIcon is mapped to svg by default. antd components need no mapping.
     default: ''
+  aliases:
+    description: >-
+      In-house wrappers around antd components, one "WrapperName: AntdComponent" per line (e.g.
+      "AccessibleTooltip: Tooltip"), so the antd rules check them. Only imported components match. For per-rule
+      aliases (a wrapper that meets a rule when it gets a prop), use the config file.
+    default: ''
   config:
-    description: JSON config file (rules with options, jsx-a11y settings), relative to the repository root. Used only if it exists.
+    description: JSON config file (rules with options, jsx-a11y settings, aliases), relative to the repository root. Used only if it exists.
     default: .github/antd-a11y.json
   comment:
     description: Post or update one sticky PR comment with the results.

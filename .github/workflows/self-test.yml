@@ -26,6 +26,7 @@ jobs:
         with:
           working-directory: fixtures/app
           changed-only: false
+          config: fixtures/app/antd-a11y.json   # wrapper aliases for src/bad/Wrappers.tsx
           comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
 
       - name: Check the results
@@ -36,8 +37,8 @@ jobs:
         run: |
           echo "outcome=$OUTCOME violations=$VIOLATIONS blocking=$BLOCKING"
           test "$OUTCOME" = "failure"
-          test "$VIOLATIONS" = "18"
-          test "$BLOCKING" = "14"
+          test "$VIOLATIONS" = "21"
+          test "$BLOCKING" = "17"
 
       - name: Upload SARIF to code scanning
         if: always() && steps.guard.outputs.sarif-file != ''
