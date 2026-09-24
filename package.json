@@ -1,6 +1,6 @@
 {
   "name": "antd-a11y-action",
-  "version": "0.9.5",
+  "version": "0.10.0",
   "private": true,
   "description": "GitHub Action that blocks PRs introducing Ant Design accessibility violations",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-antd-a11y",
-  "version": "0.9.5",
+  "version": "0.10.0",
   "description": "ESLint rules and config for accessibility issues in Ant Design apps; the same checks the antd A11y Guard GitHub Action runs",
   "license": "MIT",
   "type": "module",

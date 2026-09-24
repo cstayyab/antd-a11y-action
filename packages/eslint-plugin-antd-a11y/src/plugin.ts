@@ -11,7 +11,7 @@ import tableColumnHasTitle from './rules/table-column-has-title.js';
 import tooltipNoDisabledChild from './rules/tooltip-no-disabled-child.js';
 
 export const PLUGIN_NAME = 'antd-a11y';
-export const VERSION = '0.9.5';
+export const VERSION = '0.10.0';
 
 export const rules = {
   'icon-button-has-name': iconButtonHasName,
