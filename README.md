@@ -364,9 +364,11 @@ The PR comment shows how many findings were suppressed.
 
 ## Run it locally with ESLint
 
-> The plugin isn't on npm yet; publishing it is tracked in [#3](https://github.com/cstayyab/antd-a11y-action/issues/3). The setup below is what it will look like.
+The action's static check is built on [`eslint-plugin-antd-a11y`](https://www.npmjs.com/package/eslint-plugin-antd-a11y), and the plugin can run the same check in your editor, in a pre-push hook, or with `npx eslint`. It uses the same rules, `.github/antd-a11y.json`, jsx-a11y tuning and filters, aliases, `a11y-ignore` comments and blocking threshold, so a clean local run means a clean PR check.
 
-The action's static check is built on `eslint-plugin-antd-a11y`, and the plugin can run the same check in your editor, in a pre-push hook, or with `npx eslint`. It uses the same rules, `.github/antd-a11y.json`, jsx-a11y tuning and filters, aliases, `a11y-ignore` comments and blocking threshold, so a clean local run means a clean PR check.
+```sh
+npm install --save-dev eslint-plugin-antd-a11y
+```
 
 ```js
 // eslint.config.js
@@ -418,6 +420,12 @@ npm ci --prefix runtime   # runner deps for the runtime sub-action
 npm run check   # typecheck + lint + tests (rules, DOM checks against antd 5 and 6, runtime)
 npm run build   # bundles the action into dist/ (commit the result)
 ```
+
+**Releasing:**
+1. Bump the version in every `package.json` (root, plugin, `runtime/`, `runtime/guard/`) and the plugin's `VERSION` constant.
+2. Run `npm run build` and commit the result.
+3. Publish a GitHub release tagged `v<version>`. [`release-npm.yml`](.github/workflows/release-npm.yml) publishes `eslint-plugin-antd-a11y` at the same version through npm trusted publishing, after checking the tag matches the version and the tests pass.
+4. Fast-forward the `v0` branch to the release commit.
 
 ---
 

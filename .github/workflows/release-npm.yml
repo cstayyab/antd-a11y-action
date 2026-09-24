@@ -1,0 +1,82 @@
+# Publishes eslint-plugin-antd-a11y to npm when a GitHub release is published, so the action and the
+# plugin always ship the same version. Authenticates with npm trusted publishing (OIDC): no token is
+# stored; npm trusts this workflow file for this repository.
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write # OIDC token for npm trusted publishing
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@latest
+
+      - name: Check the plugin version matches the release tag
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(node -p "require('./packages/eslint-plugin-antd-a11y/package.json').version")
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Release tag $TAG doesn't match eslint-plugin-antd-a11y version $version. Bump the version before releasing."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # 0.x releases are the current version, so they go to "latest"; only semver pre-releases
+          # (1.0.0-rc.1) go to "next".
+          case "$version" in *-*) echo "dist-tag=next" >> "$GITHUB_OUTPUT" ;; *) echo "dist-tag=latest" >> "$GITHUB_OUTPUT" ;; esac
+
+      - name: Skip versions already on npm
+        id: published
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if npm view "eslint-plugin-antd-a11y@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::eslint-plugin-antd-a11y@$VERSION is already on npm; nothing to publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.published.outputs.skip != 'true'
+        run: npm ci
+
+      - if: steps.published.outputs.skip != 'true'
+        name: Install runtime sub-action dependencies
+        run: npm ci --prefix runtime
+
+      - if: steps.published.outputs.skip != 'true'
+        name: Check and test before publishing
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+
+      - if: steps.published.outputs.skip != 'true'
+        run: npm run build:plugin
+
+      - if: steps.published.outputs.skip != 'true'
+        name: Publish
+        working-directory: packages/eslint-plugin-antd-a11y
+        env:
+          DIST_TAG: ${{ steps.version.outputs.dist-tag }}
+        run: npm publish --access public --tag "$DIST_TAG"
