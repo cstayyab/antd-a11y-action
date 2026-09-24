@@ -5,7 +5,7 @@
  * the same snippets with real antd and check the claim in the DOM, so a rule
  * can't silently turn into a false positive when antd changes its markup.
  */
-import { cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import axe from 'axe-core';
 import { computeAccessibleName } from 'dom-accessibility-api';
 import type { ReactElement } from 'react';
@@ -45,6 +45,13 @@ window.matchMedia ??= ((query: string) => ({
   removeEventListener() {},
   dispatchEvent: () => false,
 })) as typeof window.matchMedia;
+
+// jsdom has no ResizeObserver; antd's popups measure their trigger with it.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
 
 afterEach(cleanup);
 
@@ -271,6 +278,46 @@ describe('static limits', () => {
     const button = c.querySelector('button');
     expect(button?.disabled).toBe(true);
     expect(isKeyboardFocusable(button)).toBe(false);
+  });
+});
+
+// popup-trigger-focusable treats a wrapper as focusable when it holds a focusable control, because the
+// events the popup listens for bubble from the control to the wrapper antd bound them to.
+describe('popup-trigger-focusable: events bubble from a focusable descendant', () => {
+  it('focusing a Button inside a span opens a focus-triggered Tooltip', async () => {
+    mount(
+      <Tooltip title="Limit reached" trigger={['hover', 'focus']}>
+        <span>
+          <Button aria-disabled>Add</Button>
+        </span>
+      </Tooltip>,
+    );
+    act(() => screen.getByRole('button').focus());
+    expect(await screen.findByRole('tooltip', {}, { timeout: 2000 })).toBeTruthy();
+  });
+  it('clicking a Button inside a span opens a click-triggered Dropdown', async () => {
+    mount(
+      <Dropdown trigger={['click']} menu={{ items: [{ key: '1', label: 'Rename' }] }}>
+        <span>
+          <Button>Actions</Button>
+        </span>
+      </Dropdown>,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    expect(await screen.findByRole('menu', {}, { timeout: 2000 })).toBeTruthy();
+  });
+  it('trigger={[]} binds nothing to the child: hover, focus and click leave it closed', async () => {
+    mount(
+      <Tooltip title="Positioned here" trigger={[]}>
+        <span>anchor</span>
+      </Tooltip>,
+    );
+    const anchor = screen.getByText('anchor');
+    fireEvent.mouseEnter(anchor);
+    fireEvent.focus(anchor);
+    fireEvent.click(anchor);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(screen.queryByRole('tooltip')).toBeNull();
   });
 });
 

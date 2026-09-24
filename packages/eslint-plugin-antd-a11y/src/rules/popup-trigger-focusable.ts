@@ -1,7 +1,6 @@
-import { AST_NODE_TYPES } from '@typescript-eslint/utils';
 import { createRule } from '../utils/create-rule.js';
 import { createResolver } from '../utils/antd-imports.js';
-import { wrappedDisabledButton } from '../utils/popup.js';
+import { hasFocusableDescendant, hasNoTrigger, popupTrigger, reportNode, wrappedDisabledButton } from '../utils/popup.js';
 import { TOOLTIP_POPUPS } from './tooltip-no-disabled-child.js';
 import {
   getProp,
@@ -9,7 +8,6 @@ import {
   hasSpread,
   intrinsicName,
   mayBeTrue,
-  meaningfulChildren,
   propValue,
 } from '../utils/jsx.js';
 
@@ -48,14 +46,18 @@ export default createRule({
       JSXElement(node) {
         const popup = resolver.componentName(node.openingElement);
         if (!popup || !POPUPS.has(popup)) return;
-        const children = meaningfulChildren(node);
-        if (children.length !== 1 || children[0].type !== AST_NODE_TYPES.JSXElement) return;
-        const child = children[0].openingElement;
+        // trigger={[]}: antd binds nothing to the child; it only positions a popup opened elsewhere.
+        if (hasNoTrigger(node.openingElement)) return;
+        const triggerElement = popupTrigger(node, context.sourceCode);
+        if (!triggerElement) return;
+        const child = triggerElement.openingElement;
         if (hasSpread(child) || hasMeaningfulProp(child, 'role')) return;
         if (getProp(child, 'tabIndex') && propValue(child, 'tabIndex') !== -1) return;
         if (mayBeTrue(child, 'contentEditable')) return;
         // <Tooltip><span><Button disabled /></span></Tooltip>: tooltip-no-disabled-child names the real problem.
-        if (TOOLTIP_POPUPS.has(popup) && wrappedDisabledButton(children[0], resolver)) return;
+        if (TOOLTIP_POPUPS.has(popup) && wrappedDisabledButton(triggerElement, resolver, context.sourceCode)) return;
+        // <span><Button>Add</Button></span>: the Button takes focus and its events bubble to the span.
+        if (hasFocusableDescendant(triggerElement, resolver, context.sourceCode)) return;
 
         const tag = intrinsicName(child);
         let trigger: string | null = null;
@@ -68,7 +70,7 @@ export default createRule({
           if (name && NON_FOCUSABLE_ANTD.has(name)) trigger = `<${name}>`;
         }
         if (!trigger) return;
-        context.report({ node: child, messageId: 'notFocusable', data: { popup, trigger } });
+        context.report({ node: reportNode(node, triggerElement), messageId: 'notFocusable', data: { popup, trigger } });
       },
     };
   },

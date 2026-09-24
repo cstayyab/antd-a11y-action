@@ -204,7 +204,9 @@ The rules read JSX, not the rendered page, so props that a component adds at run
 </Tooltip>
 ```
 
-`tooltip-no-disabled-child` can't report this; the site shows up as `popup-trigger-focusable` on the `span` instead. To keep the trigger focusable, control the popup's `open` rather than passing `disabled`. The same applies to any component, antd's or your own, that clones its child and sets props on it.
+Neither rule reports this: the JSX shows an enabled `Button` inside the `span`, which is keyboard-reachable as written. To keep the trigger focusable, control the popup's `open` rather than passing `disabled`. The same applies to any component, antd's or your own, that clones its child and sets props on it.
+
+The rules also can't see context outside the element they check. A tooltip trigger inside an element that is itself focusable, such as a `<span>` inside antd's `role="tab"`, is reported by `popup-trigger-focusable` even though the tab takes focus. Suppress it at that site with `// a11y-ignore popup-trigger-focusable -- the tab is the focus stop`.
 
 ## Runtime check
 

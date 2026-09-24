@@ -1,6 +1,6 @@
 import { createRule } from '../utils/create-rule.js';
 import { createResolver } from '../utils/antd-imports.js';
-import { isDisabledButton, popupTrigger, wrappedDisabledButton } from '../utils/popup.js';
+import { hasNoTrigger, isDisabledButton, popupTrigger, reportNode, wrappedDisabledButton } from '../utils/popup.js';
 
 /** Popups this rule covers. popup-trigger-focusable leaves wrapped disabled buttons in these to this rule. */
 export const TOOLTIP_POPUPS = new Set(['Tooltip', 'Popover']);
@@ -29,15 +29,17 @@ export default createRule({
       JSXElement(node) {
         const popup = resolver.componentName(node.openingElement);
         if (!popup || !TOOLTIP_POPUPS.has(popup)) return;
-        const trigger = popupTrigger(node);
+        // trigger={[]}: the popup is opened by something else, so the child never needs focus.
+        if (hasNoTrigger(node.openingElement)) return;
+        const trigger = popupTrigger(node, context.sourceCode);
         if (!trigger) return;
         if (isDisabledButton(trigger.openingElement, resolver)) {
-          context.report({ node: trigger.openingElement, messageId: 'disabled', data: { popup } });
+          context.report({ node: reportNode(node, trigger), messageId: 'disabled', data: { popup } });
           return;
         }
-        const wrapped = wrappedDisabledButton(trigger, resolver);
+        const wrapped = wrappedDisabledButton(trigger, resolver, context.sourceCode);
         if (wrapped) {
-          context.report({ node: wrapped.button, messageId: 'wrapped', data: { popup, wrapper: wrapped.wrapper } });
+          context.report({ node: wrapped.at, messageId: 'wrapped', data: { popup, wrapper: wrapped.wrapper } });
         }
       },
     };
