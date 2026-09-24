@@ -57,6 +57,21 @@ Impact uses axe-core's scale, and `fail-on` (default `serious`) decides what blo
 
 **Built to stay quiet when unsure.** A rule only reports on components it can trace back to an `antd` import (named, aliased, namespace, `antd/es/*`, or `const { Item } = Form`). Spread props, `id`s and custom children count as "may be labelled". Each rule's claim about antd's markup is also checked in CI by rendering real antd and inspecting the DOM (`packages/eslint-plugin-antd-a11y/tests/dom`).
 
+**jsx-a11y, tuned.** The jsx-a11y layer runs the recommended set with a few precision changes:
+
+- `control-has-associated-label` is on, so `<button><svg/></button>` is caught.
+- `no-autofocus` is off.
+- `no-redundant-roles` allows `role="list"` on `ul`/`ol`, which restores list semantics that Safari drops.
+- Filters drop reports jsx-a11y can't see past:
+  - a spread (dnd-kit's `{...attributes}`) that may supply the role or `tabIndex`
+  - a conditional role with an interactive branch (`role={x ? 'button' : undefined}`)
+  - key handlers on `role="dialog"`, `alertdialog`, `group` or `tabpanel`
+  - an icon component with a `title`
+
+  Rule ids and messages are unchanged, and the filters apply whatever you configure.
+
+When an antd rule and a jsx-a11y rule flag the same element, only the antd finding is kept.
+
 ## Inputs
 
 | Input | Default | Description |
@@ -66,7 +81,10 @@ Impact uses axe-core's scale, and `fail-on` (default `serious`) decides what blo
 | `include` | `**/*.{js,jsx,ts,tsx}` | Globs relative to `working-directory` (comma or newline separated) |
 | `exclude` | | Globs to skip. `node_modules`, `dist`, `build`, `coverage`, `.next` and `*.d.ts` are always skipped. |
 | `working-directory` | `.` | Directory to scan, e.g. `apps/web` in a monorepo |
-| `jsx-a11y` | `true` | Also run `eslint-plugin-jsx-a11y`'s recommended rules |
+| `jsx-a11y` | `recommended` | `eslint-plugin-jsx-a11y` preset: `recommended` (tuned, see above), `strict`, or `false`. `true` means `recommended`. |
+| `components` | | Map your own components to the element they render, one `Name: tag` per line (`Icon: svg`, `Link: a`), so jsx-a11y checks them. `FontAwesomeIcon: svg` is built in. antd components need no mapping. |
+| `rules` | | Per-rule severity, one `rule-id: off\|warn\|error` per line. See [Configuration](#configuration). |
+| `config` | `.github/antd-a11y.json` | JSON config file, used when it exists. See [Configuration](#configuration). |
 | `comment` | `true` | Post and update one sticky PR comment. Clean PRs get no comment. |
 | `sarif-file` | `antd-a11y.sarif` | Where to write the SARIF report |
 | `max-annotations` | `50` | Cap on inline annotations |
@@ -76,6 +94,54 @@ Impact uses axe-core's scale, and `fail-on` (default `serious`) decides what blo
 `baseline` is reserved for the baseline layer and ignored for now. The runtime check is a separate step; see below.
 
 **Outputs:** `violations`, `blocking-violations`, `sarif-file`.
+
+## Configuration
+
+Per-rule severity works in both actions:
+
+- `off` turns the rule off.
+- `warn` reports its findings but never blocks.
+- `error` blocks on every finding, whatever its impact or `fail-on`.
+
+Every other rule follows `fail-on`. Ids are `antd-a11y/<rule>` (or just `<rule>`), `jsx-a11y/<rule>`, `runtime/<rule>` and `axe/<rule-id>`.
+
+```yaml
+      - uses: cstayyab/antd-a11y-action@v0
+        with:
+          rules: |
+            jsx-a11y/anchor-is-valid: off
+            picker-has-name: warn            # 40 existing violations, fixing them over time
+            modal-has-title: error           # at zero, keep it there
+```
+
+That is a ratchet. Set `error` on rules your codebase is clean on, so they can't regress. Set `warn` on rules with a backlog, so they are visible without blocking. When a backlog reaches zero, flip its rule to `error`.
+
+For rule options and jsx-a11y settings, use a config file. The action reads `.github/antd-a11y.json` when it exists (the `config` input changes the path):
+
+```json
+{
+  "jsxA11y": "recommended",
+  "rules": {
+    "jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }],
+    "jsx-a11y/anchor-is-valid": "off",
+    "antd-a11y/picker-has-name": "warn",
+    "axe/color-contrast": "warn"
+  },
+  "settings": {
+    "components": { "Link": "a", "Icon": "svg" },
+    "polymorphicPropName": "as"
+  }
+}
+```
+
+Rules take a severity, or `[severity, options]` as in ESLint. The options go to the rule unchanged; only antd-a11y and jsx-a11y rules take them. `settings` is jsx-a11y's (`components`, `polymorphicPropName`, `attributes`). Workflow inputs override the file, and the file overrides the defaults. The runtime action reads the same file's `runtime/*` and `axe/*` rules.
+
+Guardrails:
+
+- The action never reads your ESLint config, so a permissive or broken `.eslintrc` can't switch it off.
+- An unknown rule id, or options a rule's schema rejects, fails the step. A typo never silently disables a rule.
+- Turning off every antd rule logs a warning.
+- The PR comment footer lists the overrides (e.g. "3 rules overridden (`.github/antd-a11y.json`): 2 off, 1 warn"), so reviewers can see when the gate was loosened.
 
 ## Runtime check
 
@@ -180,6 +246,8 @@ Every route records where it actually landed. A route that ends up on another pa
 | `comment` | `true` | Sticky PR comment (separate from the static one) |
 | `sarif-file` | `antd-a11y-runtime.sarif` | Only findings mapped to a source file go into SARIF |
 | `artifact-name` | `antd-a11y-runtime` | Per-route JSON results are uploaded under this name |
+| `rules` | | Per-rule severity for `runtime/*` and `axe/*` ids (`axe/color-contrast: warn`); see [Configuration](#configuration) |
+| `config` | `.github/antd-a11y.json` | Config file shared with the static action |
 
 **Outputs:** `total`, `blocking`, `critical`, `serious`, `guard-active`, `redirects`, `sarif-file`.
 

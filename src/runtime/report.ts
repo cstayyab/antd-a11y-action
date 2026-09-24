@@ -11,6 +11,8 @@ import { upsertComment } from '../report/pr-comment.js';
 import { toSarif } from '../report/sarif.js';
 import { IMPACTS, impactRank, type Finding, type Impact, type ScanResult } from '../types.js';
 import { axeImpact, axeRuleInfo, runtimeRuleInfo } from './rules.js';
+import { overridesNote, resolveConfig, type RuleOverride } from '../config.js';
+import { blockingFor } from '../severity.js';
 
 export const RUNTIME_MARKER = '<!-- antd-a11y-guard:runtime -->';
 
@@ -36,6 +38,8 @@ export type FailOn = Impact | 'none';
 
 export interface RuntimeOptions {
   failOn: FailOn;
+  /** Per-rule overrides for runtime/* and axe/* ids (off drops findings; warn/error set blocking). */
+  rules?: ReadonlyMap<string, RuleOverride>;
   /** App directory and repo root, to turn app-relative source paths into repo paths. */
   cwd: string;
   workspace: string;
@@ -59,12 +63,11 @@ const AUTHORING_RULES = new Set([
   'no-positive-tabindex',
 ]);
 
-function blocking(impact: Impact, failOn: FailOn): boolean {
-  return failOn !== 'none' && impactRank(impact) >= impactRank(failOn);
-}
+const NO_OVERRIDES: ReadonlyMap<string, RuleOverride> = new Map();
 
 /** Merges per-route results, deduping the same issue seen on several routes. */
 export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): RuntimeResult {
+  const rules = opts.rules ?? NO_OVERRIDES;
   const result: RuntimeResult = {
     findings: [],
     filesScanned: 0,
@@ -95,6 +98,7 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
   for (const page of pages) {
     for (const v of page.runtime) {
       const info = runtimeRuleInfo(v.rule);
+      if (rules.get(info.id)?.severity === 'off') continue;
       result.rules.set(info.id, info);
       const inLibrary = v.origin === 'library' && AUTHORING_RULES.has(v.rule);
       const impact: Impact = inLibrary ? 'minor' : info.impact;
@@ -112,7 +116,7 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
         ruleId: info.id,
         message,
         impact,
-        blocking: blocking(impact, opts.failOn),
+        blocking: blockingFor(info.id, impact, opts.failOn, rules),
         target: file ? undefined : (v.selector ?? v.site),
         wcag: info.wcag,
       }));
@@ -120,13 +124,14 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
     for (const v of page.axe) {
       const impact = axeImpact(v.impact);
       const info = axeRuleInfo(v.id, v.help, v.helpUrl, impact, v.tags);
+      if (rules.get(info.id)?.severity === 'off') continue;
       if (!result.rules.has(info.id)) result.rules.set(info.id, info);
       for (const target of v.targets) {
         add(`${info.id}|${target}`, label(page), () => ({
           ruleId: info.id,
           message: v.help,
           impact,
-          blocking: blocking(impact, opts.failOn),
+          blocking: blockingFor(info.id, impact, opts.failOn, rules),
           target,
           wcag: info.wcag,
         }));
@@ -187,7 +192,12 @@ export async function run(env = process.env): Promise<void> {
     core.setFailed('The runtime check produced no results: no route loaded. See the crawl step log.');
     return;
   }
-  const result = buildRuntimeResult(pages, { failOn, cwd, workspace });
+  const config = resolveConfig({
+    rules: env.IN_RULES,
+    configFile: env.IN_CONFIG || '.github/antd-a11y.json',
+    workspace,
+  });
+  const result = buildRuntimeResult(pages, { failOn, cwd, workspace, rules: config.rules });
   const blockingCount = result.findings.filter((f) => f.blocking).length;
 
   const maxAnnotations = Number(env.IN_MAX_ANNOTATIONS || 50);
@@ -226,6 +236,7 @@ export async function run(env = process.env): Promise<void> {
     title: 'antd A11y Guard: runtime',
     scanned: `${result.routes.length} ${result.routes.length === 1 ? 'route' : 'routes'}`,
     banner,
+    overrides: overridesNote(config, ['runtime/', 'axe/']),
   });
   if (env.GITHUB_STEP_SUMMARY) await core.summary.addRaw(markdown).write();
 

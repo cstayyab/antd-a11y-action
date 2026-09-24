@@ -5,6 +5,7 @@ import Ajv from 'ajv-draft-04';
 import { describe, expect, it } from 'vitest';
 import { filterFiles, normalizeDir, walk } from '../src/files.js';
 import { list } from '../src/inputs.js';
+import { resolveConfig } from '../src/config.js';
 import { A11yLinter, parseIgnoreDirectives } from '../src/lint.js';
 import { impactFor } from '../src/severity.js';
 import { COMMENT_MARKER, renderMarkdown } from '../src/report/markdown.js';
@@ -14,11 +15,15 @@ import type { ScanResult } from '../src/types.js';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const fixture = path.join(root, 'fixtures/app');
 
+/** A linter with the default config, optionally without jsx-a11y. */
+const makeLinter = (jsxA11y = true) =>
+  new A11yLinter({ config: resolveConfig({ jsxA11y: String(jsxA11y), workspace: root }), failOn: 'serious' });
+
 const emptyResult = (): ScanResult => ({ findings: [], filesScanned: 0, parseErrors: [], suppressed: 0, rules: new Map() });
 
 async function scanFixture(): Promise<ScanResult> {
   const files = filterFiles(await walk(fixture, ''), '', ['**/*.{js,jsx,ts,tsx}'], []);
-  return new A11yLinter({ jsxA11y: true, failOn: 'serious' }).lintFiles(fixture, files);
+  return makeLinter(true).lintFiles(fixture, files);
 }
 
 describe('inputs', () => {
@@ -60,7 +65,7 @@ describe('a11y-ignore', () => {
   });
 
   it('suppresses findings on the same or next line and counts them', () => {
-    const linter = new A11yLinter({ jsxA11y: false, failOn: 'serious' });
+    const linter = makeLinter(false);
     const result = emptyResult();
     linter.lintSource(
       'a.tsx',
@@ -89,7 +94,8 @@ describe('lint', () => {
     const antdRules = (await readdir(path.join(root, 'packages/eslint-plugin-antd-a11y/src/rules'))).map(
       (f) => `antd-a11y/${f.replace(/\.ts$/, '')}`,
     );
-    expect([...rules].sort()).toEqual(antdRules.sort());
+    // bad/Native.tsx covers the jsx-a11y layer on native elements.
+    expect([...rules].sort()).toEqual([...antdRules, 'jsx-a11y/control-has-associated-label'].sort());
   });
 
   it('attaches each rule\'s WCAG criteria to its findings', async () => {
@@ -113,7 +119,7 @@ describe('lint', () => {
   });
 
   it('runs jsx-a11y on plain elements and ignores unknown rules in disable comments', () => {
-    const linter = new A11yLinter({ jsxA11y: true, failOn: 'serious' });
+    const linter = makeLinter(true);
     const result = emptyResult();
     linter.lintSource(
       'b.jsx',
@@ -129,7 +135,7 @@ describe('lint', () => {
 
   it('records parse errors without failing', () => {
     const result = emptyResult();
-    new A11yLinter({ jsxA11y: false, failOn: 'serious' }).lintSource('broken.tsx', 'const = <div', result);
+    makeLinter(false).lintSource('broken.tsx', 'const = <div', result);
     expect(result.findings).toEqual([]);
     expect(result.parseErrors).toHaveLength(1);
   });

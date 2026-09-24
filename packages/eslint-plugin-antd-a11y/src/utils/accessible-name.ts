@@ -27,10 +27,14 @@ export function hasOwnName(
  * True when the element renders text a screen reader would read as its name.
  * Any expression child counts (it may render text); icon components do not.
  */
-export function hasTextContent(element: TSESTree.JSXElement, resolver: AntdResolver): boolean {
+export function hasTextContent(
+  element: TSESTree.JSXElement,
+  resolver: AntdResolver,
+  isGraphic: (opening: TSESTree.JSXOpeningElement) => boolean = () => false,
+): boolean {
   return meaningfulChildren(element).some((child) => {
     if (child.type === AST_NODE_TYPES.JSXElement) {
-      if (resolver.isIcon(child.openingElement)) return false;
+      if (resolver.isIcon(child.openingElement) || isGraphic(child.openingElement)) return false;
       if (child.openingElement.name.type === AST_NODE_TYPES.JSXIdentifier) {
         const tag = child.openingElement.name.name;
         if (tag === 'svg' || tag === 'img' || tag === 'i') {

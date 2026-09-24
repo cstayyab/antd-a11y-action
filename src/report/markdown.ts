@@ -16,6 +16,8 @@ export interface MarkdownContext {
   scanned?: string;
   /** Shown as a quote above the results, e.g. a guard health warning. */
   banner?: string;
+  /** Footer note when configuration changed rule severities, so reviewers see a loosened gate. */
+  overrides?: string;
 }
 
 /** "[4.1.2](understanding link) [2.4.4](…)", hovering shows the criterion's name and level. */
@@ -94,6 +96,7 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
   const notes: string[] = [];
   if (result.suppressed > 0) notes.push(`${result.suppressed} suppressed with \`a11y-ignore\` or \`eslint-disable\``);
   if (result.parseErrors.length > 0) notes.push(`${result.parseErrors.length} files could not be parsed`);
+  if (ctx.overrides) notes.push(ctx.overrides);
   if (notes.length > 0) lines.push('', `<sub>${notes.join(' · ')}</sub>`);
   return `${lines.join('\n')}\n`;
 }

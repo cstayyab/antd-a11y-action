@@ -1,7 +1,8 @@
 import antdA11y from 'eslint-plugin-antd-a11y';
 import type { AntdA11yDocs } from 'eslint-plugin-antd-a11y';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
-import type { Impact, RuleInfo } from './types.js';
+import type { RuleOverride } from './config.js';
+import { impactRank, type Impact, type RuleInfo } from './types.js';
 
 const ANTD_PREFIX = 'antd-a11y/';
 const JSX_PREFIX = 'jsx-a11y/';
@@ -89,4 +90,20 @@ export function ruleInfo(ruleId: string): RuleInfo {
     wcag: known?.wcag ?? [],
     impact: known?.impact ?? 'serious',
   };
+}
+
+/**
+ * Whether a finding blocks: a per-rule override wins (warn never blocks, error always does);
+ * otherwise its impact is compared with fail-on.
+ */
+export function blockingFor(
+  ruleId: string,
+  impact: Impact,
+  failOn: Impact | 'none',
+  overrides: ReadonlyMap<string, RuleOverride>,
+): boolean {
+  const override = overrides.get(ruleId)?.severity;
+  if (override === 'warn') return false;
+  if (override === 'error') return true;
+  return failOn !== 'none' && impactRank(impact) >= impactRank(failOn);
 }

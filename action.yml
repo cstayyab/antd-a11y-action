@@ -27,8 +27,23 @@ inputs:
     description: Directory to scan, relative to the repository root.
     default: .
   jsx-a11y:
-    description: Also run eslint-plugin-jsx-a11y's recommended rules for plain JSX elements.
-    default: 'true'
+    description: >-
+      jsx-a11y preset for plain JSX elements: recommended (tuned; see README "Precision"), strict, or false.
+      Empty lets the config file decide, else recommended. true means recommended.
+    default: ''
+  rules:
+    description: >-
+      Per-rule severity, one "rule-id: off|warn|error" per line. warn reports but never blocks; error always
+      blocks; off doesn't run the rule. Bare names mean antd-a11y rules.
+    default: ''
+  components:
+    description: >-
+      Map wrapper components to the element they render, one "Name: tag" per line, so jsx-a11y checks them
+      (e.g. "Icon: svg"). FontAwesomeIcon is mapped to svg by default. antd components need no mapping.
+    default: ''
+  config:
+    description: JSON config file (rules with options, jsx-a11y settings), relative to the repository root. Used only if it exists.
+    default: .github/antd-a11y.json
   comment:
     description: Post or update one sticky PR comment with the results.
     default: 'true'

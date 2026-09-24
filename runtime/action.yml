@@ -73,6 +73,14 @@ inputs:
   artifact-name:
     description: Name of the uploaded results artifact. Set a different one when the action runs twice in a job.
     default: antd-a11y-runtime
+  rules:
+    description: >-
+      Per-rule severity for runtime/* and axe/* findings, one "rule-id: off|warn|error" per line
+      (e.g. "axe/color-contrast: warn"). warn reports but never blocks; error always blocks; off drops them.
+    default: ''
+  config:
+    description: JSON config file shared with the static action; its runtime/* and axe/* rules apply here.
+    default: .github/antd-a11y.json
   github-token:
     description: Token used to write the PR comment.
     default: ${{ github.token }}
@@ -165,6 +173,8 @@ runs:
         IN_FAIL_ON: ${{ inputs.fail-on }}
         IN_REQUIRE_GUARD: ${{ inputs.require-guard }}
         IN_FAIL_ON_REDIRECT: ${{ inputs.fail-on-redirect }}
+        IN_RULES: ${{ inputs.rules }}
+        IN_CONFIG: ${{ inputs.config }}
         IN_COMMENT: ${{ inputs.comment }}
         IN_TOKEN: ${{ inputs.github-token }}
         IN_SARIF_FILE: ${{ inputs.sarif-file }}

@@ -17,7 +17,14 @@ export interface Inputs {
   token: string;
   comment: boolean;
   sarifFile: string;
-  jsxA11y: boolean;
+  /** Raw jsx-a11y preset input (recommended | strict | false); empty lets the config file decide. */
+  jsxA11y: string;
+  /** Per-rule severity lines, "rule-id: off|warn|error". */
+  rules: string;
+  /** jsx-a11y component mapping lines, "Name: tag". */
+  components: string;
+  /** JSON config file, relative to the repository root; used only if it exists. */
+  configFile: string;
   maxAnnotations: number;
 }
 
@@ -88,7 +95,10 @@ export function readInputs(): Inputs {
     token: core.getInput('github-token'),
     comment: bool('comment', true),
     sarifFile: core.getInput('sarif-file') || 'antd-a11y.sarif',
-    jsxA11y: bool('jsx-a11y', true),
+    jsxA11y: core.getInput('jsx-a11y'),
+    rules: core.getInput('rules'),
+    components: core.getInput('components'),
+    configFile: core.getInput('config') || '.github/antd-a11y.json',
     maxAnnotations,
   };
 }

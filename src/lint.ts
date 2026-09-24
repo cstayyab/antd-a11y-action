@@ -2,25 +2,27 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
-import antdA11y, { configs as antdConfigs } from 'eslint-plugin-antd-a11y';
+import antdA11y from 'eslint-plugin-antd-a11y';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
-import { impactFor, isA11yRule, ruleInfo } from './severity.js';
-import { impactRank, type Finding, type Impact, type ScanResult } from './types.js';
+import { ConfigError, eslintRules, type ActionConfig } from './config.js';
+import { wrapPlugin } from './jsx-a11y-filters.js';
+import { blockingFor, impactFor, isA11yRule, ruleInfo } from './severity.js';
+import type { Finding, Impact, ScanResult } from './types.js';
 
 export const SOURCE_EXTENSIONS = ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'mts', 'cts'];
 
 export interface LintOptions {
-  jsxA11y: boolean;
+  config: ActionConfig;
   failOn: Impact;
 }
 
-export function buildConfig(options: Pick<LintOptions, 'jsxA11y'>): Linter.Config[] {
-  const plugins: Record<string, unknown> = { 'antd-a11y': antdA11y };
-  let rules: Linter.RulesRecord = { ...(antdConfigs.recommended.rules as Linter.RulesRecord) };
-  if (options.jsxA11y) {
-    plugins['jsx-a11y'] = jsxA11y;
-    rules = { ...(jsxA11y.flatConfigs.recommended.rules as Linter.RulesRecord), ...rules };
-  }
+// jsx-a11y rules run through filters for patterns they can't see through (spreads, conditional
+// roles, keyboard-handling roles), whatever options the user gives them.
+const wrappedJsxA11y = wrapPlugin(jsxA11y);
+
+export function buildConfig(config: ActionConfig): Linter.Config[] {
+  const rules = eslintRules(config);
+  const { components, polymorphicPropName, attributes } = config.settings;
   return [
     {
       files: [`**/*.{${SOURCE_EXTENSIONS.join(',')}}`],
@@ -31,7 +33,15 @@ export function buildConfig(options: Pick<LintOptions, 'jsxA11y'>): Linter.Confi
         parserOptions: { ecmaFeatures: { jsx: true } },
       },
       linterOptions: { reportUnusedDisableDirectives: 'off' },
-      plugins: plugins as Linter.Config['plugins'],
+      // Registered even with the preset off, so a rule a user turns on individually still resolves.
+      plugins: { 'antd-a11y': antdA11y, 'jsx-a11y': wrappedJsxA11y } as unknown as Linter.Config['plugins'],
+      settings: {
+        'jsx-a11y': {
+          components,
+          ...(polymorphicPropName ? { polymorphicPropName } : {}),
+          ...(attributes ? { attributes } : {}),
+        },
+      },
       rules,
     },
   ];
@@ -75,7 +85,13 @@ export class A11yLinter {
   private readonly config: Linter.Config[];
 
   constructor(private readonly options: LintOptions) {
-    this.config = buildConfig(options);
+    this.config = buildConfig(options.config);
+    // Invalid rule options throw here with ESLint's own message, instead of failing on every file.
+    try {
+      this.linter.verify('', this.config, { filename: 'config-check.tsx' });
+    } catch (error) {
+      throw new ConfigError(`Invalid rule configuration: ${(error as Error).message.replace(/\s*\n\s*/g, ' ').trim()}`);
+    }
   }
 
   /** Lints one file's source. `file` is the repo-relative path used in reports. */
@@ -87,12 +103,18 @@ export class A11yLinter {
     result.suppressed += suppressedMessages.filter((m) => isA11yRule(m.ruleId)).length;
 
     const directives = parseIgnoreDirectives(code);
+    // Where an antd-a11y rule reported, it's the more precise (DOM-verified) finding: drop a jsx-a11y
+    // report on the same element, e.g. control-has-associated-label on a mapped antd Button.
+    const antdAt = new Set(
+      messages.filter((m) => m.ruleId?.startsWith('antd-a11y/')).map((m) => `${m.line}:${m.column}`),
+    );
     for (const message of messages) {
       if (message.fatal) {
         result.parseErrors.push({ file, line: message.line, message: message.message });
         continue;
       }
       if (!isA11yRule(message.ruleId)) continue;
+      if (message.ruleId.startsWith('jsx-a11y/') && antdAt.has(`${message.line}:${message.column}`)) continue;
       if (isIgnored(directives, message.line, message.ruleId)) {
         result.suppressed += 1;
         continue;
@@ -107,7 +129,7 @@ export class A11yLinter {
         ruleId: message.ruleId,
         message: message.message,
         impact,
-        blocking: impactRank(impact) >= impactRank(this.options.failOn),
+        blocking: blockingFor(message.ruleId, impact, this.options.failOn, this.options.config.rules),
       };
       if (!result.rules.has(message.ruleId)) result.rules.set(message.ruleId, ruleInfo(message.ruleId));
       finding.wcag = result.rules.get(message.ruleId)!.wcag;

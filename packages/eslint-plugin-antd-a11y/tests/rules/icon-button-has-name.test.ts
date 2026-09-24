@@ -19,6 +19,8 @@ run('icon-button-has-name', rule, {
     w(`<Button icon={<TrashIcon />} />`),
     w(`<Button icon={icon} />`),
     w(`<Button><TrashIcon /></Button>`),
+    // A component mapped to svg in settings['jsx-a11y'].components, named by its title
+    { code: w(`<Button><FontAwesomeIcon icon={faTrash} title="Delete" /></Button>`), settings: { 'jsx-a11y': { components: { FontAwesomeIcon: 'svg' } } } },
     // Not antd
     `import { Button } from './my-button'; <Button icon={<X />} />`,
     `const Button = (p) => null; <Button icon={<X />} />`,
@@ -34,6 +36,9 @@ run('icon-button-has-name', rule, {
     { code: w(`<Button icon={<svg viewBox="0 0 1 1" />} />`), errors: [error] },
     { code: w(`<Button><img src="trash.png" /></Button>`), errors: [error] },
     { code: w(`<Button><i className="fa fa-trash" /></Button>`), errors: [error] },
+    // Components mapped to svg in settings['jsx-a11y'].components
+    { code: w(`<Button><FontAwesomeIcon icon={faTrash} /></Button>`), settings: { 'jsx-a11y': { components: { FontAwesomeIcon: 'svg' } } }, errors: [error] },
+    { code: w(`<Button icon={<FontAwesomeIcon icon={faTrash} />} />`), settings: { 'jsx-a11y': { components: { FontAwesomeIcon: 'svg' } } }, errors: [error] },
     // Aliased and namespace imports
     { code: `import { Button as AntButton } from 'antd'; <AntButton icon={<svg />} />`, errors: [error] },
     { code: `import * as antd from 'antd'; <antd.Button icon={<svg />} />`, errors: [error] },

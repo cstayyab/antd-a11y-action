@@ -36,8 +36,8 @@ jobs:
         run: |
           echo "outcome=$OUTCOME violations=$VIOLATIONS blocking=$BLOCKING"
           test "$OUTCOME" = "failure"
-          test "$VIOLATIONS" = "14"
-          test "$BLOCKING" = "10"
+          test "$VIOLATIONS" = "17"
+          test "$BLOCKING" = "13"
 
       - name: Upload SARIF to code scanning
         if: always() && steps.guard.outputs.sarif-file != ''

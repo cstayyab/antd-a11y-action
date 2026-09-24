@@ -4,6 +4,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { VERSION } from 'eslint-plugin-antd-a11y';
 import { changedFiles, pullRequestFromContext } from './changed-files.js';
+import { configWarnings, overridesNote, resolveConfig } from './config.js';
 import { filterFiles, normalizeDir, walk } from './files.js';
 import { readInputs } from './inputs.js';
 import { A11yLinter } from './lint.js';
@@ -39,7 +40,16 @@ export async function run(): Promise<void> {
   core.debug(`${candidates.length} candidates; include=${JSON.stringify(inputs.include)} exclude=${JSON.stringify(inputs.exclude)}`);
   core.info(`Scanning ${files.length} files (${scope}).`);
 
-  const linter = new A11yLinter({ jsxA11y: inputs.jsxA11y, failOn: inputs.failOn });
+  const config = resolveConfig({
+    jsxA11y: inputs.jsxA11y,
+    rules: inputs.rules,
+    components: inputs.components,
+    configFile: inputs.configFile,
+    workspace,
+  });
+  if (config.file) core.info(`Using ${config.file}.`);
+  for (const warning of configWarnings(config)) core.warning(warning);
+  const linter = new A11yLinter({ config, failOn: inputs.failOn });
   const result = await linter.lintFiles(workspace, files);
   const blocking = result.findings.filter((f) => f.blocking).length;
 
@@ -55,7 +65,12 @@ export async function run(): Promise<void> {
   // context.repo throws outside GitHub Actions, so read the env var directly.
   const repository = process.env.GITHUB_REPOSITORY;
   const blobBase = repository && sha ? `${serverUrl}/${repository}/blob/${sha}` : undefined;
-  const markdown = renderMarkdown(result, { failOn: inputs.failOn, blobBase, scope });
+  const markdown = renderMarkdown(result, {
+    failOn: inputs.failOn,
+    blobBase,
+    scope,
+    overrides: overridesNote(config, ['antd-a11y/', 'jsx-a11y/']),
+  });
 
   if (process.env.GITHUB_STEP_SUMMARY) {
     await core.summary.addRaw(markdown).write();
