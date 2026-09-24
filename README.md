@@ -4,7 +4,7 @@ A GitHub Action that blocks pull requests adding accessibility problems to React
 
 > Two layers: the **static** action (10 antd rules plus jsx-a11y's recommended set, on changed files) and the **[runtime check](#runtime-check)** sub-action (starts your app, crawls routes with Playwright + axe, and in Next.js apps blames issues on the source line that rendered them). Both report through inline annotations, SARIF for Code Scanning and a sticky PR comment. The theme contrast layer is next; see [Roadmap](#roadmap).
 
-> **Beta (0.x).** `@v0` is a branch that moves to each 0.x release, so pinning it gets fixes automatically. To stay on one version, pin a release tag (`@v0.9.3`) or a commit SHA. Inputs may still change between minor versions until 1.0, which ships once the baseline file and theme audit land; see [Roadmap](#roadmap) and the release notes before upgrading.
+> **Beta (0.x).** `@v0` is a branch that moves to each 0.x release, so pinning it gets fixes automatically. To stay on one version, pin a release tag (`@v0.9.4`) or a commit SHA. Inputs may still change between minor versions until 1.0, which ships once the baseline file and theme audit land; see [Roadmap](#roadmap) and the release notes before upgrading.
 
 ## Quick start
 

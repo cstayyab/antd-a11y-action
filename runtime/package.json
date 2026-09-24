@@ -1,6 +1,6 @@
 {
   "name": "antd-a11y-runtime",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "private": true,
   "description": "Runner dependencies for the antd A11y Guard runtime sub-action. Installed on the runner with npm ci.",
   "type": "module",
