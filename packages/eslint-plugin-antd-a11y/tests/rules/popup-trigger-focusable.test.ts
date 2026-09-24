@@ -13,10 +13,14 @@ run('popup-trigger-focusable', rule, {
     w(`<Tooltip title="Help"><Input /></Tooltip>`),
     w(`<Popover content={c}><MyTrigger /></Popover>`),
     w(`<Tooltip title="Help"><span {...props} /></Tooltip>`),
+    // A span around a disabled button is reported by tooltip-no-disabled-child instead
+    w(`<Tooltip title="Limit reached"><span><Button disabled={isAtMax}>Add</Button></span></Tooltip>`),
     `import { Tooltip } from '@mui/material'; <Tooltip title="x"><span>i</span></Tooltip>`,
   ],
   invalid: [
     { code: w(`<Dropdown menu={m}><span>Actions</span></Dropdown>`), errors: [error] },
+    // tooltip-no-disabled-child doesn't cover Dropdown, so the span is still reported here
+    { code: w(`<Dropdown menu={m}><span><Button disabled>Actions</Button></span></Dropdown>`), errors: [error] },
     { code: w(`<Dropdown menu={m}><a onClick={(e) => e.preventDefault()}>More</a></Dropdown>`), errors: [error] },
     { code: w(`<Tooltip title="Help"><DeleteOutlined /></Tooltip>`), errors: [error] },
     { code: w(`<Popover content={c}><Avatar src={u} /></Popover>`), errors: [error] },

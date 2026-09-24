@@ -246,6 +246,18 @@ describe('tooltip-no-disabled-child', () => {
     const focusable = [...c.querySelectorAll('*')].filter(isKeyboardFocusable);
     expect(focusable).toEqual([]);
   });
+  it('wrapped: a span around the disabled Button takes no focus either', () => {
+    const c = mount(
+      <Tooltip title="Limit reached" trigger={['hover', 'focus']}>
+        <span>
+          <Button disabled>Add</Button>
+        </span>
+      </Tooltip>,
+    );
+    expect(c.querySelector('span')).not.toBeNull();
+    const focusable = [...c.querySelectorAll('*')].filter(isKeyboardFocusable);
+    expect(focusable).toEqual([]);
+  });
 });
 
 describe('popup-trigger-focusable', () => {

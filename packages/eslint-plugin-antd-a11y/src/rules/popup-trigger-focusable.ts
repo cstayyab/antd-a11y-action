@@ -1,6 +1,8 @@
 import { AST_NODE_TYPES } from '@typescript-eslint/utils';
 import { createRule } from '../utils/create-rule.js';
 import { createResolver } from '../utils/antd-imports.js';
+import { wrappedDisabledButton } from '../utils/popup.js';
+import { TOOLTIP_POPUPS } from './tooltip-no-disabled-child.js';
 import {
   getProp,
   hasMeaningfulProp,
@@ -52,6 +54,8 @@ export default createRule({
         if (hasSpread(child) || hasMeaningfulProp(child, 'role')) return;
         if (getProp(child, 'tabIndex') && propValue(child, 'tabIndex') !== -1) return;
         if (mayBeTrue(child, 'contentEditable')) return;
+        // <Tooltip><span><Button disabled /></span></Tooltip>: tooltip-no-disabled-child names the real problem.
+        if (TOOLTIP_POPUPS.has(popup) && wrappedDisabledButton(children[0], resolver)) return;
 
         const tag = intrinsicName(child);
         let trigger: string | null = null;

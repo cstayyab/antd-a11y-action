@@ -1,9 +1,9 @@
-import { AST_NODE_TYPES } from '@typescript-eslint/utils';
 import { createRule } from '../utils/create-rule.js';
 import { createResolver } from '../utils/antd-imports.js';
-import { intrinsicName, mayBeTrue, meaningfulChildren } from '../utils/jsx.js';
+import { isDisabledButton, popupTrigger, wrappedDisabledButton } from '../utils/popup.js';
 
-const POPUPS = new Set(['Tooltip', 'Popover']);
+/** Popups this rule covers. popup-trigger-focusable leaves wrapped disabled buttons in these to this rule. */
+export const TOOLTIP_POPUPS = new Set(['Tooltip', 'Popover']);
 
 export default createRule({
   name: 'tooltip-no-disabled-child',
@@ -17,6 +17,8 @@ export default createRule({
     messages: {
       disabled:
         '<{{popup}}> wraps a disabled button, which cannot take focus, so keyboard and screen reader users never get the tooltip. Put the reason in visible text, or use aria-disabled and block the click in the handler instead.',
+      wrapped:
+        '<{{popup}}> wraps a disabled button in a <{{wrapper}}>. The <{{wrapper}}> lets mouse users hover, but the button still cannot take focus, so keyboard and screen reader users never get the tooltip. Use aria-disabled on the button and block the click in the handler, or put the reason in visible text.',
     },
     schema: [],
   },
@@ -26,13 +28,17 @@ export default createRule({
     return {
       JSXElement(node) {
         const popup = resolver.componentName(node.openingElement);
-        if (!popup || !POPUPS.has(popup)) return;
-        const children = meaningfulChildren(node);
-        if (children.length !== 1 || children[0].type !== AST_NODE_TYPES.JSXElement) return;
-        const child = children[0].openingElement;
-        const isButton = resolver.componentName(child) === 'Button' || intrinsicName(child) === 'button';
-        if (!isButton || !mayBeTrue(child, 'disabled')) return;
-        context.report({ node: child, messageId: 'disabled', data: { popup } });
+        if (!popup || !TOOLTIP_POPUPS.has(popup)) return;
+        const trigger = popupTrigger(node);
+        if (!trigger) return;
+        if (isDisabledButton(trigger.openingElement, resolver)) {
+          context.report({ node: trigger.openingElement, messageId: 'disabled', data: { popup } });
+          return;
+        }
+        const wrapped = wrappedDisabledButton(trigger, resolver);
+        if (wrapped) {
+          context.report({ node: wrapped.button, messageId: 'wrapped', data: { popup, wrapper: wrapped.wrapper } });
+        }
       },
     };
   },

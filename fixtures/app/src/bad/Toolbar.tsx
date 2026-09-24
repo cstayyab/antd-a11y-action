@@ -3,7 +3,7 @@ import { DeleteOutlined, MoreOutlined } from '@ant-design/icons';
 
 // icon-button-has-name (unnamed graphic, critical)
 // icon-button-has-name (icon's built-in label only, moderate)
-// tooltip-no-disabled-child, popup-trigger-focusable
+// tooltip-no-disabled-child (direct, and wrapped in a span), popup-trigger-focusable
 export function Toolbar({ canDelete }: { canDelete: boolean }) {
   return (
     <div>
@@ -11,6 +11,11 @@ export function Toolbar({ canDelete }: { canDelete: boolean }) {
       <Button type="text" icon={<DeleteOutlined />} />
       <Tooltip title="You need delete rights">
         <Button disabled={!canDelete}>Delete</Button>
+      </Tooltip>
+      <Tooltip title="You need edit rights" trigger={['hover', 'focus']}>
+        <span>
+          <Button disabled={!canDelete}>Rename</Button>
+        </span>
       </Tooltip>
       <Dropdown menu={{ items: [{ key: 'rename', label: 'Rename' }] }}>
         <span>

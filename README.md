@@ -47,7 +47,7 @@ Nothing to install: the action ships its own parser and rules and ignores your E
 | [`modal-has-title`](docs/rules/modal-has-title.md) | `Modal` / `Drawer` without `title` (unnamed dialog) | serious |
 | [`table-column-has-title`](docs/rules/table-column-has-title.md) | Table columns with a missing or empty `title` | moderate |
 | [`image-has-alt`](docs/rules/image-has-alt.md) | antd `Image` without `alt` | serious |
-| [`tooltip-no-disabled-child`](docs/rules/tooltip-no-disabled-child.md) | `Tooltip` / `Popover` around a disabled `Button` (keyboard can't reach it) | serious |
+| [`tooltip-no-disabled-child`](docs/rules/tooltip-no-disabled-child.md) | `Tooltip` / `Popover` around a disabled `Button`, directly or through a `<span>` wrapper (keyboard can't reach it) | serious |
 | [`popup-trigger-focusable`](docs/rules/popup-trigger-focusable.md) | `Dropdown` / `Tooltip` / `Popover` / `Popconfirm` on a `span`, icon, `Avatar`… | serious |
 | [`auth-input-autocomplete`](docs/rules/auth-input-autocomplete.md) | `autoComplete="off"` or paste blocking on login fields (WCAG 2.2 3.3.8) | serious |
 
