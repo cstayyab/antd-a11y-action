@@ -140,6 +140,13 @@ describe('configuration (C and C2)', () => {
     expect(ids('const A = () => <Dropdown autoFocus menu={m}><button>x</button></Dropdown>;', file)).toEqual([]);
   });
 
+  it('keeps the preset\'s options when a rule gets a bare severity (unlike ESLint, where "warn" drops them)', () => {
+    const rules = 'jsx-a11y/no-noninteractive-element-interactions: warn\njsx-a11y/no-noninteractive-tabindex: error';
+    // recommended exempts onLoad/onError on img and iframe, and allows expression values for tabIndex.
+    expect(ids('const A = () => <><img alt="" src="x" onLoad={f} onError={f} /><iframe title="t" onLoad={f} /></>;', { rules })).toEqual([]);
+    expect(ids('const A = () => <span tabIndex={x ? undefined : 0}>x</span>;', { rules })).toEqual([]);
+  });
+
   it('applies warn and error to blocking', () => {
     const img = 'const A = () => <img src="x" />;'; // alt-text is critical
     expect(lint(img)[0].blocking).toBe(true);

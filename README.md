@@ -134,7 +134,7 @@ For rule options and jsx-a11y settings, use a config file. The action reads `.gi
 }
 ```
 
-Rules take a severity, or `[severity, options]` as in ESLint. The options go to the rule unchanged; only antd-a11y and jsx-a11y rules take them. `settings` is jsx-a11y's (`components`, `polymorphicPropName`, `attributes`). Workflow inputs override the file, and the file overrides the defaults. The runtime action reads the same file's `runtime/*` and `axe/*` rules.
+Rules take a severity, or `[severity, options]` as in ESLint. The options go to the rule unchanged; only antd-a11y and jsx-a11y rules take them. Unlike ESLint, a bare severity keeps the options the preset sets (recommended's exemptions for `onLoad` on `img`, expression values for `tabIndex`), so `"warn"` never makes a rule stricter. `settings` is jsx-a11y's (`components`, `polymorphicPropName`, `attributes`). Workflow inputs override the file, and the file overrides the defaults. The runtime action reads the same file's `runtime/*` and `axe/*` rules.
 
 Guardrails:
 
