@@ -14,7 +14,7 @@ export type { AntdA11yDocs, Impact } from './utils/create-rule.js';
 export { aliasErrors, aliasWarnings, type AliasMap, type AliasSpec } from './utils/aliases.js';
 
 export const PLUGIN_NAME = 'antd-a11y';
-export const VERSION = '0.9.4';
+export const VERSION = '0.9.5';
 
 export const rules = {
   'icon-button-has-name': iconButtonHasName,
