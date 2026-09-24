@@ -18,6 +18,8 @@ export interface Finding {
   /** Runtime findings: routes where the issue was seen, and the DOM selector (axe) or callsite. */
   routes?: string[];
   target?: string;
+  /** WCAG success criteria the finding fails, e.g. ["4.1.2"]. */
+  wcag?: string[];
   ruleId: string;
   message: string;
   impact: Impact;

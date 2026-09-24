@@ -92,6 +92,15 @@ describe('lint', () => {
     expect([...rules].sort()).toEqual(antdRules.sort());
   });
 
+  it('attaches each rule\'s WCAG criteria to its findings', async () => {
+    const result = await scanFixture();
+    const icon = result.findings.find((f) => f.ruleId === 'antd-a11y/icon-button-has-name');
+    expect(icon?.wcag).toEqual(['4.1.2', '2.4.4']);
+    const auth = result.findings.find((f) => f.ruleId === 'antd-a11y/auth-input-autocomplete');
+    expect(auth?.wcag).toContain('3.3.8');
+    expect(result.findings.every((f) => Array.isArray(f.wcag))).toBe(true);
+  });
+
   it('marks findings blocking from their impact and the fail-on threshold', async () => {
     const result = await scanFixture();
     const weak = result.findings.find((f) => f.message.includes('built-in English label'));
@@ -148,6 +157,8 @@ describe('sarif', () => {
     const result = await scanFixture();
     const run = toSarif(result, 'serious', '0.0.0-test').runs[0];
     expect(run.results).toHaveLength(result.findings.length);
+    const iconRule = run.tool.driver.rules.find((r) => r.id === 'antd-a11y/icon-button-has-name');
+    expect(iconRule?.help?.markdown).toContain('[4.1.2 Name, Role, Value (A)](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value)');
     for (const r of run.results) {
       expect(run.tool.driver.rules[r.ruleIndex].id).toBe(r.ruleId);
       expect(r.locations[0].physicalLocation.artifactLocation.uri).toMatch(/^src\//);
@@ -170,6 +181,9 @@ describe('markdown', () => {
     expect(md).toContain('[src/bad/Orders.tsx:');
     expect(md).toContain('https://github.com/o/r/blob/abc123/src/bad/Orders.tsx#L');
     expect(md).toContain('| [`antd-a11y/modal-has-title`](');
+    // WCAG column: criteria link to the W3C Understanding page, with name and level on hover.
+    expect(md).toContain('| Rule | WCAG |');
+    expect(md).toContain('[4.1.2](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value "Name, Role, Value (Level A)")');
   });
 
   it('renders a clean result', () => {

@@ -25,7 +25,16 @@ const pages: PageResult[] = [
       { rule: 'click-events-need-role', message: '<div onClick> without an interactive role', origin: 'app', location: { file: 'app/embed.tsx' } },
       { rule: 'click-events-need-role', message: '<div onClick> without an interactive role', origin: 'library', location: { file: 'app/embed.tsx' } },
     ],
-    axe: [{ id: 'image-alt', impact: 'critical', help: 'Images must have alternative text', helpUrl: 'https://x/image-alt', targets: ['img'] }],
+    axe: [
+      {
+        id: 'image-alt',
+        impact: 'critical',
+        help: 'Images must have alternative text',
+        helpUrl: 'https://x/image-alt',
+        tags: ['cat.text-alternatives', 'wcag2a', 'wcag111', 'section508'],
+        targets: ['img'],
+      },
+    ],
   },
   {
     route: '/other',
@@ -99,6 +108,13 @@ describe('buildRuntimeResult', () => {
   it('records redirects and labels their findings with where the page landed', () => {
     expect(result.redirects).toEqual([{ route: '/account', to: '/login' }]);
     expect(byId('axe/target-size')[0].routes).toEqual(['/account → /login']);
+  });
+
+  it('carries WCAG criteria from the guard rule table and from axe tags', () => {
+    expect(byId('runtime/accessible-name')[0].wcag).toEqual(['4.1.2']);
+    expect(byId('axe/image-alt')[0].wcag).toEqual(['1.1.1']);
+    expect(result.rules.get('axe/image-alt')?.wcag).toEqual(['1.1.1']);
+    expect(byId('axe/region')[0].wcag).toEqual([]);
   });
 
   it('never blocks with fail-on none', () => {

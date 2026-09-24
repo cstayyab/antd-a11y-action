@@ -79,6 +79,7 @@ for (const route of routes) {
             impact: v.impact,
             help: v.help,
             helpUrl: v.helpUrl,
+            tags: v.tags,
             targets: v.nodes.map((n) => n.target.join(" ")),
           })),
         },

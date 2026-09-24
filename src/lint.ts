@@ -109,8 +109,9 @@ export class A11yLinter {
         impact,
         blocking: impactRank(impact) >= impactRank(this.options.failOn),
       };
-      result.findings.push(finding);
       if (!result.rules.has(message.ruleId)) result.rules.set(message.ruleId, ruleInfo(message.ruleId));
+      finding.wcag = result.rules.get(message.ruleId)!.wcag;
+      result.findings.push(finding);
     }
     result.filesScanned += 1;
   }

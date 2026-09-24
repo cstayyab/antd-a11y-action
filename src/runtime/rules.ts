@@ -1,4 +1,5 @@
 import type { Impact, RuleInfo } from '../types.js';
+import { fromAxeTags } from '../wcag.js';
 
 export const RUNTIME_PREFIX = 'runtime/';
 export const AXE_PREFIX = 'axe/';
@@ -46,6 +47,12 @@ export function axeImpact(impact: string | null | undefined): Impact {
   return impact && AXE_IMPACTS.has(impact as Impact) ? (impact as Impact) : 'moderate';
 }
 
-export function axeRuleInfo(id: string, help: string, helpUrl: string | undefined, impact: Impact): RuleInfo {
-  return { id: `${AXE_PREFIX}${id}`, description: help, helpUri: helpUrl, wcag: [], impact };
+export function axeRuleInfo(
+  id: string,
+  help: string,
+  helpUrl: string | undefined,
+  impact: Impact,
+  tags: readonly string[] = [],
+): RuleInfo {
+  return { id: `${AXE_PREFIX}${id}`, description: help, helpUri: helpUrl, wcag: fromAxeTags(tags), impact };
 }

@@ -1,4 +1,5 @@
 import { impactRank, type Finding, type Impact, type RuleInfo, type ScanResult } from '../types.js';
+import { criterion, describe } from '../wcag.js';
 
 export const TOOL_NAME = 'antd-a11y-guard';
 export const TOOL_URI = 'https://github.com/cstayyab/antd-a11y-action';
@@ -13,6 +14,28 @@ function levelFor(impact: Impact, blocking: boolean): Level {
 // Code Scanning sorts by security-severity; map impact onto its 0-10 scale.
 const SEVERITY_SCORE: Record<Impact, string> = { minor: '2.0', moderate: '4.0', serious: '7.0', critical: '9.0' };
 
+/** Help text naming the WCAG criteria, shown in the Code Scanning alert. */
+function helpFor(rule: RuleInfo) {
+  const text: string[] = [];
+  const markdown: string[] = [];
+  if (rule.wcag.length) {
+    text.push(`WCAG: ${rule.wcag.map(describe).join('; ')}`);
+    markdown.push(
+      '**WCAG success criteria**',
+      '',
+      ...rule.wcag.map((id) => {
+        const c = criterion(id);
+        return c.url ? `- [${describe(id)}](${c.url})` : `- ${id}`;
+      }),
+    );
+  }
+  if (rule.helpUri) {
+    text.push(`See ${rule.helpUri}`);
+    markdown.push('', `[Rule documentation](${rule.helpUri})`);
+  }
+  return text.length ? { help: { text: text.join('\n'), markdown: markdown.join('\n').trim() } } : {};
+}
+
 function ruleDescriptor(rule: RuleInfo, failOn: Impact | 'none') {
   const blocking = failOn !== 'none' && impactRank(rule.impact) >= impactRank(failOn);
   return {
@@ -20,7 +43,8 @@ function ruleDescriptor(rule: RuleInfo, failOn: Impact | 'none') {
     name: rule.id,
     shortDescription: { text: rule.description },
     fullDescription: { text: rule.description },
-    ...(rule.helpUri ? { helpUri: rule.helpUri, help: { text: `See ${rule.helpUri}` } } : {}),
+    ...(rule.helpUri ? { helpUri: rule.helpUri } : {}),
+    ...helpFor(rule),
     defaultConfiguration: { level: levelFor(rule.impact, blocking) },
     properties: {
       tags: ['accessibility', 'a11y', ...rule.wcag.map((sc) => `wcag${sc}`)],
@@ -51,7 +75,7 @@ function resultFor(finding: Finding & { file: string; line: number }, ruleIndex:
         },
       },
     ],
-    properties: { impact: finding.impact },
+    properties: { impact: finding.impact, ...(finding.wcag?.length ? { wcag: finding.wcag } : {}) },
   };
 }
 

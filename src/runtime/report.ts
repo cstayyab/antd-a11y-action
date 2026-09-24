@@ -29,7 +29,7 @@ export interface PageResult {
     /** app: the element is written in app code. library: rendered inside a library component used at `location`. */
     origin?: 'app' | 'library' | null;
   }[];
-  axe: { id: string; impact: string | null; help: string; helpUrl?: string; targets: string[] }[];
+  axe: { id: string; impact: string | null; help: string; helpUrl?: string; tags?: string[]; targets: string[] }[];
 }
 
 export type FailOn = Impact | 'none';
@@ -114,11 +114,12 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
         impact,
         blocking: blocking(impact, opts.failOn),
         target: file ? undefined : (v.selector ?? v.site),
+        wcag: info.wcag,
       }));
     }
     for (const v of page.axe) {
       const impact = axeImpact(v.impact);
-      const info = axeRuleInfo(v.id, v.help, v.helpUrl, impact);
+      const info = axeRuleInfo(v.id, v.help, v.helpUrl, impact, v.tags);
       if (!result.rules.has(info.id)) result.rules.set(info.id, info);
       for (const target of v.targets) {
         add(`${info.id}|${target}`, label(page), () => ({
@@ -127,6 +128,7 @@ export function buildRuntimeResult(pages: PageResult[], opts: RuntimeOptions): R
           impact,
           blocking: blocking(impact, opts.failOn),
           target,
+          wcag: info.wcag,
         }));
       }
     }

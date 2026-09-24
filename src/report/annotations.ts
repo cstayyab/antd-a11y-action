@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import type { ScanResult } from '../types.js';
+import { describe } from '../wcag.js';
 
 /** Emits workflow annotations; blocking findings first. Returns how many were emitted. */
 export function annotate(result: ScanResult, max: number): number {
@@ -7,8 +8,9 @@ export function annotate(result: ScanResult, max: number): number {
   for (const finding of result.findings) {
     if (emitted >= max) break;
     if (!finding.file) continue; // nothing in the diff to attach it to
+    const wcag = finding.wcag ?? [];
     const props: core.AnnotationProperties = {
-      title: `${finding.ruleId} (${finding.impact})`,
+      title: `${finding.ruleId} (${finding.impact})${wcag.length ? ` · WCAG ${wcag.join(', ')}` : ''}`,
       file: finding.file,
       startLine: finding.line,
       startColumn: finding.column,
@@ -16,9 +18,10 @@ export function annotate(result: ScanResult, max: number): number {
       // GitHub rejects column ranges that span lines.
       ...(finding.endLine === finding.line ? { endColumn: finding.endColumn } : {}),
     };
-    if (finding.blocking) core.error(finding.message, props);
-    else if (finding.impact === 'minor') core.notice(finding.message, props);
-    else core.warning(finding.message, props);
+    const message = wcag.length ? `${finding.message}\nWCAG: ${wcag.map(describe).join('; ')}` : finding.message;
+    if (finding.blocking) core.error(message, props);
+    else if (finding.impact === 'minor') core.notice(message, props);
+    else core.warning(message, props);
     emitted += 1;
   }
   const annotatable = result.findings.filter((f) => f.file).length;

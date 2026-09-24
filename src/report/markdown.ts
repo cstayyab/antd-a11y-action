@@ -1,4 +1,5 @@
 import { IMPACTS, type Impact, type ScanResult } from '../types.js';
+import { criterion } from '../wcag.js';
 
 export const COMMENT_MARKER = '<!-- antd-a11y-guard -->';
 const MAX_ROWS = 50;
@@ -15,6 +16,16 @@ export interface MarkdownContext {
   scanned?: string;
   /** Shown as a quote above the results, e.g. a guard health warning. */
   banner?: string;
+}
+
+/** "[4.1.2](understanding link) [2.4.4](…)", hovering shows the criterion's name and level. */
+function wcagCell(ids: readonly string[] = []): string {
+  return ids
+    .map((id) => {
+      const c = criterion(id);
+      return c.url ? `[${id}](${c.url} "${c.name} (Level ${c.level})")` : id;
+    })
+    .join(' ');
 }
 
 function escapeCell(text: string): string {
@@ -42,12 +53,15 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
       counts[f.impact] += 1;
       byRule.set(f.ruleId, counts);
     }
-    lines.push('| Rule | Critical | Serious | Moderate | Minor |', '| --- | ---: | ---: | ---: | ---: |');
+    lines.push(
+      '| Rule | WCAG | Critical | Serious | Moderate | Minor |',
+      '| --- | --- | ---: | ---: | ---: | ---: |',
+    );
     for (const [ruleId, counts] of [...byRule].sort((a, b) => a[0].localeCompare(b[0]))) {
-      const help = result.rules.get(ruleId)?.helpUri;
-      const name = help ? `[\`${ruleId}\`](${help})` : `\`${ruleId}\``;
+      const rule = result.rules.get(ruleId);
+      const name = rule?.helpUri ? `[\`${ruleId}\`](${rule.helpUri})` : `\`${ruleId}\``;
       const cells = [...IMPACTS].reverse().map((impact) => (counts[impact] ? String(counts[impact]) : ''));
-      lines.push(`| ${name} | ${cells.join(' | ')} |`);
+      lines.push(`| ${name} | ${wcagCell(rule?.wcag)} | ${cells.join(' | ')} |`);
     }
     lines.push('');
 
@@ -57,8 +71,8 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
         result.findings.length > MAX_ROWS ? ` (first ${MAX_ROWS} of ${result.findings.length})` : ''
       }</summary>`,
       '',
-      '| | Location | Rule | Message |',
-      '| --- | --- | --- | --- |',
+      '| | Location | Rule | WCAG | Message |',
+      '| --- | --- | --- | --- | --- |',
     );
     for (const f of shown) {
       let where: string;
@@ -70,7 +84,9 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
         where = f.target ? `\`${escapeCell(f.target)}\`` : 'unknown';
       }
       if (f.routes?.length) where += `<br><sub>${escapeCell(f.routes.join(', '))}</sub>`;
-      lines.push(`| ${f.blocking ? 'Blocking' : f.impact} | ${where} | \`${f.ruleId}\` | ${escapeCell(f.message)} |`);
+      lines.push(
+        `| ${f.blocking ? 'Blocking' : f.impact} | ${where} | \`${f.ruleId}\` | ${wcagCell(f.wcag)} | ${escapeCell(f.message)} |`,
+      );
     }
     lines.push('', '</details>');
   }
