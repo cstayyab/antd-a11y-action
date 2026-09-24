@@ -1,14 +1,14 @@
-// In-house wrappers around antd components (`AccessibleTooltip` around `Tooltip`), declared in
+// In-house wrappers around antd components (`HintTooltip` around `Tooltip`), declared in
 // settings['antd-a11y'].aliases so the rules check them as the antd component they wrap.
 //
-//   AccessibleTooltip: 'Tooltip'                         every rule applies
-//   AccessibleTooltip: { as: 'Tooltip',                   per rule:
+//   HintTooltip: 'Tooltip'                                every rule applies
+//   HintTooltip: { as: 'Tooltip',                         per rule:
 //     only?: ['tooltip-no-disabled-child'],                 only these rules apply
 //     except?: ['popup-trigger-focusable'],                 these rules don't
-//     satisfies: { 'popup-trigger-focusable': 'wrapInButton' } }   the rule is met when the condition holds
+//     satisfies: { 'popup-trigger-focusable': 'asButton' } }  the rule is met when the condition holds
 //
 // Conditions read one prop of the wrapper element:
-//   prop          present and not false/null/undefined (`wrapInButton`, `wrapInButton={true}`)
+//   prop          present and not false/null/undefined (`asButton`, `asButton={true}`)
 //   !prop         absent, or false/null/undefined
 //   prop:string   a non-empty string (`label="Email"`); a JSX element or other literal is not
 // A condition we can't evaluate statically (a variable, a call, a spread that may set the prop)
@@ -46,7 +46,7 @@ export function aliasErrors(raw: unknown, ruleNames: readonly string[]): string[
     if (!known.has(short)) errors.push(`aliases.${name}.${where}: unknown rule "${rule}" (only antd-a11y rules use aliases).`);
   };
   for (const [name, value] of Object.entries(raw)) {
-    if (!ALIAS_NAME.test(name)) errors.push(`aliases: "${name}" is not a component name (e.g. AccessibleTooltip or UI.Tooltip).`);
+    if (!ALIAS_NAME.test(name)) errors.push(`aliases: "${name}" is not a component name (e.g. HintTooltip or UI.Tooltip).`);
     if (typeof value === 'string') {
       if (!ALIAS_NAME.test(value)) errors.push(`aliases.${name}: "${value}" is not an antd component name (e.g. Tooltip or Form.Item).`);
       continue;

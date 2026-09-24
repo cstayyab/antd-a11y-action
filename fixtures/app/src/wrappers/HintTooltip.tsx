@@ -1,14 +1,14 @@
 import type { ReactElement } from 'react';
 import { Tooltip, type TooltipProps } from 'antd';
 
-// An in-house wrapper like the ones in the beta report. With wrapInButton it renders a real <button>
+// An example in-house wrapper. With asButton it renders a real <button>
 // around a trigger that can't take focus; without it the child is passed through as-is.
-export default function AccessibleTooltip({
-  wrapInButton,
+export default function HintTooltip({
+  asButton,
   children,
   ...props
-}: TooltipProps & { wrapInButton?: boolean; children: ReactElement }) {
-  const trigger = wrapInButton ? (
+}: TooltipProps & { asButton?: boolean; children: ReactElement }) {
+  const trigger = asButton ? (
     <button type="button" className="tooltip-trigger">
       {children}
     </button>

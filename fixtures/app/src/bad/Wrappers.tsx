@@ -1,19 +1,19 @@
 import { Button } from 'antd';
-import AccessibleTooltip from '../wrappers/AccessibleTooltip';
-import LabelInput from '../wrappers/LabelInput';
+import HintTooltip from '../wrappers/HintTooltip';
+import TextField from '../wrappers/TextField';
 
 // Found only through the aliases in fixtures/app/antd-a11y.json, which the self-test passes as `config`:
-// tooltip-no-disabled-child, popup-trigger-focusable (no wrapInButton), form-control-has-name (ReactNode label)
+// tooltip-no-disabled-child, popup-trigger-focusable (no asButton), form-control-has-name (ReactNode label)
 export function Wrappers({ isAtMax }: { isAtMax: boolean }) {
   return (
     <div>
-      <AccessibleTooltip title="You can add up to 5 sources">
+      <HintTooltip title="You can add up to 5 sources">
         <Button disabled={isAtMax}>Add</Button>
-      </AccessibleTooltip>
-      <AccessibleTooltip title="What this means">
+      </HintTooltip>
+      <HintTooltip title="What this means">
         <span>?</span>
-      </AccessibleTooltip>
-      <LabelInput label={<strong>Email</strong>} />
+      </HintTooltip>
+      <TextField label={<strong>Email</strong>} />
     </div>
   );
 }

@@ -44,7 +44,7 @@ inputs:
   aliases:
     description: >-
       In-house wrappers around antd components, one "WrapperName: AntdComponent" per line (e.g.
-      "AccessibleTooltip: Tooltip"), so the antd rules check them. Only imported components match. For per-rule
+      "HintTooltip: Tooltip"), so the antd rules check them. Only imported components match. For per-rule
       aliases (a wrapper that meets a rule when it gets a prop), use the config file.
     default: ''
   config:

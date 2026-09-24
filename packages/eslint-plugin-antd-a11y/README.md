@@ -29,8 +29,8 @@ export default [
     settings: {
       'antd-a11y': {
         aliases: {
-          LabelInput: 'Input',
-          AccessibleTooltip: { as: 'Tooltip', satisfies: { 'popup-trigger-focusable': 'wrapInButton' } },
+          TextField: 'Input',
+          HintTooltip: { as: 'Tooltip', satisfies: { 'popup-trigger-focusable': 'asButton' } },
         },
       },
     },

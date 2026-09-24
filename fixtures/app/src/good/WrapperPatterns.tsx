@@ -1,14 +1,14 @@
-import AccessibleTooltip from '../wrappers/AccessibleTooltip';
-import LabelInput from '../wrappers/LabelInput';
+import HintTooltip from '../wrappers/HintTooltip';
+import TextField from '../wrappers/TextField';
 
 // The same wrappers used as intended; the aliases' conditions keep these quiet.
 export function WrapperPatterns() {
   return (
     <div>
-      <AccessibleTooltip title="What this means" wrapInButton>
+      <HintTooltip title="What this means" asButton>
         <span>?</span>
-      </AccessibleTooltip>
-      <LabelInput label="Email" />
+      </HintTooltip>
+      <TextField label="Email" />
     </div>
   );
 }

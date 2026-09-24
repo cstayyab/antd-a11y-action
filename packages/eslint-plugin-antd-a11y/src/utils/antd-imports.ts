@@ -137,7 +137,7 @@ function resolveTag(scope: Scope, tag: JSXTagName): Binding {
   return null;
 }
 
-/** "AccessibleTooltip" or "UI.Tooltip" for a tag whose root identifier is imported, else null. */
+/** "HintTooltip" or "UI.Tooltip" for a tag whose root identifier is imported, else null. */
 function importedTagName(scope: Scope, tag: JSXTagName): string | null {
   const parts: string[] = [];
   let current: JSXTagName = tag;

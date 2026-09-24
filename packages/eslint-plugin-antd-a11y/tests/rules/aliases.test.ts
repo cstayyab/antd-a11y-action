@@ -3,12 +3,12 @@ import { rules } from '../../src/index.js';
 import { aliasErrors } from '../../src/utils/aliases.js';
 import { run } from '../rule-tester.js';
 
-// The wrappers from the beta report: AccessibleTooltip wraps antd Tooltip and, with wrapInButton,
-// renders a real <button> around its child; LabelInput wraps Input and renders a <label> only
+// Example wrappers: HintTooltip wraps antd Tooltip and, with asButton,
+// renders a real <button> around its child; TextField wraps Input and renders a <label> only
 // when its label prop is a string.
 const IMPORTS = `import { Button, Input, Tooltip } from 'antd';
-import AccessibleTooltip from '@/components/AccessibleTooltip';
-import LabelInput from '@/components/LabelInput';
+import HintTooltip from '@/components/HintTooltip';
+import TextField from '@/components/TextField';
 import * as UI from '@/ui';
 `;
 const w = (code: string) => IMPORTS + code;
@@ -16,8 +16,8 @@ const w = (code: string) => IMPORTS + code;
 const settings = {
   'antd-a11y': {
     aliases: {
-      AccessibleTooltip: { as: 'Tooltip', satisfies: { 'popup-trigger-focusable': 'wrapInButton' } },
-      LabelInput: { as: 'Input', satisfies: { 'form-control-has-name': 'label:string' } },
+      HintTooltip: { as: 'Tooltip', satisfies: { 'popup-trigger-focusable': 'asButton' } },
+      TextField: { as: 'Input', satisfies: { 'form-control-has-name': 'label:string' } },
       'UI.Tip': 'Tooltip',
     },
   },
@@ -27,22 +27,22 @@ const withSettings = (code: string) => ({ code: w(code), settings });
 run('tooltip-no-disabled-child', rules['tooltip-no-disabled-child'], {
   valid: [
     // Without an alias the wrapper is invisible, as before.
-    w(`<AccessibleTooltip title="x"><Button disabled>Add</Button></AccessibleTooltip>`),
+    w(`<HintTooltip title="x"><Button disabled>Add</Button></HintTooltip>`),
     // A component defined in the file is not the imported wrapper, even with the same name.
     {
-      code: `import { Button } from 'antd'; const AccessibleTooltip = (p) => p.children;
-<AccessibleTooltip title="x"><Button disabled>Add</Button></AccessibleTooltip>`,
+      code: `import { Button } from 'antd'; const HintTooltip = (p) => p.children;
+<HintTooltip title="x"><Button disabled>Add</Button></HintTooltip>`,
       settings,
     },
-    withSettings(`<AccessibleTooltip title="x"><Button>Add</Button></AccessibleTooltip>`),
+    withSettings(`<HintTooltip title="x"><Button>Add</Button></HintTooltip>`),
   ],
   invalid: [
-    { ...withSettings(`<AccessibleTooltip title="why disabled"><Button disabled aria-label="Add" /></AccessibleTooltip>`), errors: [{ messageId: 'disabled', data: { popup: 'Tooltip' } }] },
-    // The case from the report: the span restores hover, not focus. wrapInButton doesn't change this rule.
+    { ...withSettings(`<HintTooltip title="why disabled"><Button disabled aria-label="Add" /></HintTooltip>`), errors: [{ messageId: 'disabled', data: { popup: 'Tooltip' } }] },
+    // A span wrapper restores hover, not focus. asButton doesn't change this rule.
     {
-      ...withSettings(`<AccessibleTooltip title={isAtMax ? MSG : ''} trigger={['hover', 'focus']} wrapInButton>
+      ...withSettings(`<HintTooltip title={isAtMax ? MSG : ''} trigger={['hover', 'focus']} asButton>
   <span><Button disabled={isAtMax}>Add</Button></span>
-</AccessibleTooltip>`),
+</HintTooltip>`),
       errors: [{ messageId: 'wrapped' }],
     },
     { ...withSettings(`<UI.Tip title="x"><Button disabled>Add</Button></UI.Tip>`), errors: [{ messageId: 'disabled' }] },
@@ -51,28 +51,28 @@ run('tooltip-no-disabled-child', rules['tooltip-no-disabled-child'], {
 
 run('popup-trigger-focusable', rules['popup-trigger-focusable'], {
   valid: [
-    // wrapInButton renders a real <button>, so the rule is met.
-    withSettings(`<AccessibleTooltip title="info" wrapInButton><span>plain</span></AccessibleTooltip>`),
-    withSettings(`<AccessibleTooltip title="info" wrapInButton={true}><span>plain</span></AccessibleTooltip>`),
+    // asButton renders a real <button>, so the rule is met.
+    withSettings(`<HintTooltip title="info" asButton><span>plain</span></HintTooltip>`),
+    withSettings(`<HintTooltip title="info" asButton={true}><span>plain</span></HintTooltip>`),
     // Can't tell statically: stay quiet.
-    withSettings(`<AccessibleTooltip title="info" wrapInButton={needsButton}><span>plain</span></AccessibleTooltip>`),
-    withSettings(`<AccessibleTooltip title="info" {...tooltipProps}><span>plain</span></AccessibleTooltip>`),
+    withSettings(`<HintTooltip title="info" asButton={needsButton}><span>plain</span></HintTooltip>`),
+    withSettings(`<HintTooltip title="info" {...tooltipProps}><span>plain</span></HintTooltip>`),
     // except / only
     {
-      code: w(`<AccessibleTooltip title="info"><span>plain</span></AccessibleTooltip>`),
-      settings: { 'antd-a11y': { aliases: { AccessibleTooltip: { as: 'Tooltip', except: ['popup-trigger-focusable'] } } } },
+      code: w(`<HintTooltip title="info"><span>plain</span></HintTooltip>`),
+      settings: { 'antd-a11y': { aliases: { HintTooltip: { as: 'Tooltip', except: ['popup-trigger-focusable'] } } } },
     },
     {
-      code: w(`<AccessibleTooltip title="info"><span>plain</span></AccessibleTooltip>`),
-      settings: { 'antd-a11y': { aliases: { AccessibleTooltip: { as: 'Tooltip', only: ['antd-a11y/tooltip-no-disabled-child'] } } } },
+      code: w(`<HintTooltip title="info"><span>plain</span></HintTooltip>`),
+      settings: { 'antd-a11y': { aliases: { HintTooltip: { as: 'Tooltip', only: ['antd-a11y/tooltip-no-disabled-child'] } } } },
     },
   ],
   invalid: [
-    { ...withSettings(`<AccessibleTooltip title="info"><span>plain</span></AccessibleTooltip>`), errors: [{ messageId: 'notFocusable' }] },
-    { ...withSettings(`<AccessibleTooltip title="info" wrapInButton={false}><span>plain</span></AccessibleTooltip>`), errors: [{ messageId: 'notFocusable' }] },
+    { ...withSettings(`<HintTooltip title="info"><span>plain</span></HintTooltip>`), errors: [{ messageId: 'notFocusable' }] },
+    { ...withSettings(`<HintTooltip title="info" asButton={false}><span>plain</span></HintTooltip>`), errors: [{ messageId: 'notFocusable' }] },
     {
-      code: w(`<AccessibleTooltip title="info"><span>plain</span></AccessibleTooltip>`),
-      settings: { 'antd-a11y': { aliases: { AccessibleTooltip: 'Tooltip' } } },
+      code: w(`<HintTooltip title="info"><span>plain</span></HintTooltip>`),
+      settings: { 'antd-a11y': { aliases: { HintTooltip: 'Tooltip' } } },
       errors: [{ messageId: 'notFocusable' }],
     },
   ],
@@ -80,17 +80,17 @@ run('popup-trigger-focusable', rules['popup-trigger-focusable'], {
 
 run('form-control-has-name', rules['form-control-has-name'], {
   valid: [
-    withSettings(`<LabelInput label="Email" />`),
+    withSettings(`<TextField label="Email" />`),
     // May be a string at runtime: stay quiet.
-    withSettings(`<LabelInput label={t('email')} />`),
+    withSettings(`<TextField label={t('email')} />`),
     // A ReactNode label renders bare, but the caller supplied a name.
-    withSettings(`<LabelInput label={<Trans>Email</Trans>} aria-labelledby="email-label" />`),
-    withSettings(`<LabelInput aria-label="Email" />`),
+    withSettings(`<TextField label={<Trans>Email</Trans>} aria-labelledby="email-label" />`),
+    withSettings(`<TextField aria-label="Email" />`),
   ],
   invalid: [
-    { ...withSettings(`<LabelInput />`), errors: 1 },
-    { ...withSettings(`<LabelInput label={<Trans>Email</Trans>} />`), errors: 1 },
-    { ...withSettings(`<LabelInput label="" />`), errors: 1 },
+    { ...withSettings(`<TextField />`), errors: 1 },
+    { ...withSettings(`<TextField label={<Trans>Email</Trans>} />`), errors: 1 },
+    { ...withSettings(`<TextField label="" />`), errors: 1 },
   ],
 });
 
@@ -100,8 +100,8 @@ describe('aliasErrors', () => {
     expect(
       aliasErrors(
         {
-          AccessibleTooltip: { as: 'Tooltip', satisfies: { 'antd-a11y/popup-trigger-focusable': 'wrapInButton' } },
-          LabelInput: 'Input',
+          HintTooltip: { as: 'Tooltip', satisfies: { 'antd-a11y/popup-trigger-focusable': 'asButton' } },
+          TextField: 'Input',
           'UI.Field': { as: 'Form.Item', except: ['form-item-has-label'] },
           Picker: { as: 'Select', satisfies: { 'picker-has-name': '!unlabelled' } },
         },
@@ -123,7 +123,7 @@ describe('aliasErrors', () => {
       names,
     );
     expect(errors).toEqual([
-      'aliases: "tooltip" is not a component name (e.g. AccessibleTooltip or UI.Tooltip).',
+      'aliases: "tooltip" is not a component name (e.g. HintTooltip or UI.Tooltip).',
       'aliases.A: "not a name" is not an antd component name (e.g. Tooltip or Form.Item).',
       'aliases.B.only: unknown rule "typo-rule" (only antd-a11y rules use aliases).',
       'aliases.B: use "only" or "except", not both.',

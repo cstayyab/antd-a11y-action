@@ -146,14 +146,14 @@ Guardrails:
 
 ### Wrapper components
 
-If your codebase wraps antd components (`AccessibleTooltip` around `Tooltip`, `LabelInput` around `Input`), the rules skip the wrappers, because they only trust what they can trace to an `antd` import. Declare the wrappers so the rules check them as the component they wrap:
+If your codebase wraps antd components (`HintTooltip` around `Tooltip`, `TextField` around `Input`), the rules skip the wrappers, because they only trust what they can trace to an `antd` import. Declare the wrappers so the rules check them as the component they wrap:
 
 ```yaml
       - uses: cstayyab/antd-a11y-action@v0
         with:
           aliases: |
-            AccessibleTooltip: Tooltip
-            LabelInput: Input
+            HintTooltip: Tooltip
+            TextField: Input
 ```
 
 A wrapper often handles some rules itself, sometimes only when it gets a certain prop. Say so per rule in the config file, so those call sites aren't reported:
@@ -161,11 +161,11 @@ A wrapper often handles some rules itself, sometimes only when it gets a certain
 ```json
 {
   "aliases": {
-    "AccessibleTooltip": {
+    "HintTooltip": {
       "as": "Tooltip",
-      "satisfies": { "popup-trigger-focusable": "wrapInButton" }
+      "satisfies": { "popup-trigger-focusable": "asButton" }
     },
-    "LabelInput": {
+    "TextField": {
       "as": "Input",
       "satisfies": { "form-control-has-name": "label:string" }
     },
@@ -175,7 +175,7 @@ A wrapper often handles some rules itself, sometimes only when it gets a certain
 ```
 
 - `satisfies` maps a rule to a condition on the wrapper's props. When the condition holds, that rule is met at that call site:
-  - `prop`: the prop is present and not `false` (`wrapInButton`, `wrapInButton={true}`).
+  - `prop`: the prop is present and not `false` (`asButton`, `asButton={true}`).
   - `!prop`: the prop is absent or `false`.
   - `prop:string`: the prop is a non-empty string. `label="Email"` meets it; `label={<Trans>Email</Trans>}` doesn't, so that call site is checked like a bare `Input`.
 
