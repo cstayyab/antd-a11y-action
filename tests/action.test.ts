@@ -64,6 +64,45 @@ describe('a11y-ignore', () => {
     expect(directives.get(3)).toEqual({ rules: ['icon-button-has-name', 'jsx-a11y/alt-text'] });
   });
 
+  it('reads block comments over several lines, where the reason usually goes', () => {
+    const directives = parseIgnoreDirectives(
+      [
+        '{/* a11y-ignore popup-trigger-focusable -- the radio card is the focus stop,',
+        '    and a visually hidden sibling already carries the text */}',
+        '<span />',
+        '/* a11y-ignore picker-has-name,',
+        '   form-control-has-name */',
+        '// https://example.com/a11y-ignore is not a directive',
+      ].join('\n'),
+    );
+    // Counted where the comment starts and where it ends, so it covers the element right after it.
+    expect(directives.get(1)).toEqual({ rules: ['popup-trigger-focusable'] });
+    expect(directives.get(2)).toEqual({ rules: ['popup-trigger-focusable'] });
+    expect(directives.get(5)).toEqual({ rules: ['picker-has-name', 'form-control-has-name'] });
+    expect(directives.has(6)).toBe(false);
+  });
+
+  it('suppresses the element after a multi-line JSX comment', () => {
+    const linter = makeLinter(false);
+    const result = emptyResult();
+    linter.lintSource(
+      'a.tsx',
+      [
+        "import { Tooltip } from 'antd';",
+        'export const A = () => (',
+        '  <Tooltip title="How this is calculated">',
+        '    {/* a11y-ignore popup-trigger-focusable -- the radio card is the focus stop,',
+        '        and a visually hidden sibling already carries the text */}',
+        '    <span className="method-info" aria-hidden="true">i</span>',
+        '  </Tooltip>',
+        ');',
+      ].join('\n'),
+      result,
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.suppressed).toBe(1);
+  });
+
   it('suppresses findings on the same or next line and counts them', () => {
     const linter = makeLinter(false);
     const result = emptyResult();

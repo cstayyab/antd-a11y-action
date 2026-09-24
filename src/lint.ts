@@ -48,25 +48,35 @@ export function buildConfig(config: ActionConfig): Linter.Config[] {
   ];
 }
 
-// `// a11y-ignore`, `/* a11y-ignore icon-button-has-name */`, `{/* a11y-ignore jsx-a11y/alt-text, picker-has-name */}`
-const IGNORE_COMMENT = /(?:\/\/|\/\*)\s*a11y-ignore\b([^\n*]*)/;
+// `// a11y-ignore`, `/* a11y-ignore icon-button-has-name */`, `{/* a11y-ignore jsx-a11y/alt-text, picker-has-name */}`,
+// and block comments over several lines, which usually carry the reason:
+//   {/* a11y-ignore popup-trigger-focusable -- the radio card is the focus stop,
+//       and a visually hidden sibling carries the text */}
+const COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
+const DIRECTIVE = /^(?:\/\/|\/\*)\s*a11y-ignore\b([\s\S]*?)(?:\*\/)?$/;
 
 interface IgnoreDirective {
   rules: string[] | null; // null = every rule
 }
 
+/**
+ * Lines that carry an a11y-ignore directive. A directive covers its own line and the next one; a block
+ * comment over several lines counts on the line where it ends too, so it covers the element right after it.
+ */
 export function parseIgnoreDirectives(code: string): Map<number, IgnoreDirective> {
   const directives = new Map<number, IgnoreDirective>();
-  code.split(/\r?\n/).forEach((text, index) => {
-    const match = IGNORE_COMMENT.exec(text);
-    if (!match) return;
-    const list = match[1]
-      .replace(/--.*$/, '') // allow "a11y-ignore rule -- reason"
-      .split(',')
-      .map((r) => r.trim())
+  const lineAt = (index: number) => code.slice(0, index).split('\n').length;
+  for (const match of code.matchAll(COMMENT)) {
+    const directive = DIRECTIVE.exec(match[0]);
+    if (!directive) continue;
+    const list = directive[1]
+      .replace(/--[\s\S]*$/, '') // allow "a11y-ignore rule -- reason", the reason on as many lines as it needs
+      .split(/[\s,]+/)
       .filter(Boolean);
-    directives.set(index + 1, { rules: list.length > 0 ? list : null });
-  });
+    const entry = { rules: list.length > 0 ? list : null };
+    directives.set(lineAt(match.index), entry);
+    directives.set(lineAt(match.index + match[0].length), entry);
+  }
   return directives;
 }
 

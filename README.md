@@ -185,6 +185,7 @@ A wrapper often handles some rules itself, sometimes only when it gets a certain
 
   A list of conditions holds when any one of them does. When a value can't be read statically (a variable, a function call, a spread), the rule stays quiet.
 - `only` or `except` limit which rules apply to the wrapper at all.
+- Wrappers matter inside triggers too: `popup-trigger-focusable` counts an antd `Button` or `Input` inside a trigger as focusable, but your own `Button` wrapper only once it's aliased (`"ToolbarButton": "Button"`).
 - Aliases match imported components only. A component defined in the same file with the same name is left alone. On a full scan, an alias that matches no tag logs a warning, so typos surface.
 - Workflow input lines replace the file's entry for that wrapper.
 
@@ -205,6 +206,8 @@ The rules read JSX, not the rendered page, so props that a component adds at run
 ```
 
 Neither rule reports this: the JSX shows an enabled `Button` inside the `span`, which is keyboard-reachable as written. To keep the trigger focusable, control the popup's `open` rather than passing `disabled`. The same applies to any component, antd's or your own, that clones its child and sets props on it.
+
+A component that renders its trigger as `<span>{children}</span>` is reported even when every current caller passes a focusable element, because the rule can't see the callers, and a future caller passing plain text would break keyboard access. Treat it as a finding about the component's contract: render a focusable trigger, or suppress it at that site with the contract in the reason.
 
 The rules also can't see context outside the element they check. A tooltip trigger inside an element that is itself focusable, such as a `<span>` inside antd's `role="tab"`, is reported by `popup-trigger-focusable` even though the tab takes focus. Suppress it at that site with `// a11y-ignore popup-trigger-focusable -- the tab is the focus stop`.
 
@@ -348,7 +351,15 @@ const picker = <Select options={opts} />;
 const dialog = <Modal open={open} />;
 ```
 
-An `a11y-ignore` comment covers its own line and the next one. Name rules to ignore only those; a bare `a11y-ignore` covers all of them. The PR comment shows how many findings were suppressed.
+An `a11y-ignore` comment covers its own line and the next one. Name rules to ignore only those; a bare `a11y-ignore` covers all of them. Put the reason after `--`. It can run over several lines, and the directive then covers the element right after the comment:
+
+```jsx
+{/* a11y-ignore popup-trigger-focusable -- the radio card is the focus stop,
+    and a visually hidden sibling already carries the text */}
+<span className="method-info" aria-hidden="true">i</span>
+```
+
+The PR comment shows how many findings were suppressed.
 
 ## Using the rules in your editor
 
