@@ -4,7 +4,7 @@ A GitHub Action that blocks pull requests adding accessibility problems to React
 
 > Two layers: the **static** action (10 antd rules plus jsx-a11y's recommended set, on changed files) and the **[runtime check](#runtime-check)** sub-action (starts your app, crawls routes with Playwright + axe, and in Next.js apps blames issues on the source line that rendered them). Both report through inline annotations, SARIF for Code Scanning and a sticky PR comment. The theme contrast layer is next; see [Roadmap](#roadmap).
 
-> **Beta (0.x).** `@v0` is a branch that moves to each 0.x release, so pinning it gets fixes automatically. To stay on one version, pin a release tag (`@v0.9.1`) or a commit SHA. Inputs may still change between minor versions until 1.0, which ships once the baseline file and theme audit land; see [Roadmap](#roadmap) and the release notes before upgrading.
+> **Beta (0.x).** `@v0` is a branch that moves to each 0.x release, so pinning it gets fixes automatically. To stay on one version, pin a release tag (`@v0.9.2`) or a commit SHA. Inputs may still change between minor versions until 1.0, which ships once the baseline file and theme audit land; see [Roadmap](#roadmap) and the release notes before upgrading.
 
 ## Quick start
 
@@ -344,8 +344,8 @@ export default [antdA11y.configs.recommended];
 | Phase | Scope |
 | --- | --- |
 | **MVP** | 10 static antd rules, SARIF, sticky PR comment, changed-files mode |
-| **v1 (in progress)** | Done: runtime check (Next.js guard + axe, generic axe crawl). Next: baseline file, theme-token contrast audit, Storybook stories |
-| v1.1 | WCAG 2.2 runtime checks (focus not obscured, target size), auth via Playwright `storageState` |
+| **v1 (in progress)** | Done: runtime check (Next.js guard + axe, generic axe crawl) with sign-in and redirect detection (0.9.0); WCAG criteria on every finding and per-rule configuration (0.9.1); wrapper component aliases (0.9.2). Next: [baseline file](https://github.com/cstayyab/antd-a11y-action/issues/1), theme-token contrast audit, Storybook stories |
+| v1.1 | WCAG 2.2 runtime checks (focus not obscured, target size) |
 | v2 | Autofix via suggested changes, antd v4 support |
 
 ## Development

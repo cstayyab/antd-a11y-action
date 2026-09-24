@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-antd-a11y",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "ESLint rules for accessibility issues specific to Ant Design components",
   "license": "MIT",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "next-a11y",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "description": "Dev-time accessibility guard injected by antd A11y Guard's runtime check. Never shipped to production.",
   "type": "module",
