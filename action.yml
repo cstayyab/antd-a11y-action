@@ -12,8 +12,10 @@ inputs:
       the runtime check is the separate cstayyab/antd-a11y-action/runtime sub-action.
     default: static
   fail-on:
-    description: Lowest impact that fails the check (minor | moderate | serious | critical).
-    default: serious
+    description: >-
+      Lowest impact that fails the check (minor | moderate | serious | critical | none). Empty uses the config
+      file's failOn, which a local ESLint run reads too, or serious.
+    default: ''
   changed-only:
     description: On pull_request events, scan only files the PR adds or modifies.
     default: 'true'

@@ -6,6 +6,34 @@ undici/lib/web/fetch/body.js:
 undici/lib/web/websocket/frame.js:
   /*! ws. MIT License. Einar Otto Stangvik <einaros@gmail.com> */
 
+axe-core/axe.js:
+  /*! axe v4.13.0
+   * Copyright (c) 2015 - 2026 Deque Systems, Inc.
+   *
+   * Your use of this Source Code Form is subject to the terms of the Mozilla Public
+   * License, v. 2.0. If a copy of the MPL was not distributed with this
+   * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+   *
+   * This entire copyright notice must appear in every copy of this file you
+   * distribute or in any file that contains substantial portions of this source
+   * code.
+   */
+
+string.prototype.includes/implementation.js:
+string.prototype.includes/polyfill.js:
+string.prototype.includes/shim.js:
+string.prototype.includes/index.js:
+  /*! https://mths.be/includes v2.0.0 by @mathias */
+
+language-tags/lib/Subtag.js:
+language-tags/lib/Tag.js:
+language-tags/lib/index.js:
+  /**
+   * @author Matthew Caruana Galizia <mattcg@gmail.com>
+   * @license MIT: http://mattcg.mit-license.org/
+   * @copyright Copyright (c) 2013, Matthew Caruana Galizia
+   */
+
 natural-compare/index.js:
   /*
    * @version    1.4.0
@@ -46,34 +74,6 @@ imurmurhash/imurmurhash.js:
 
 uri-js/dist/es5/uri.all.js:
   /** @license URI.js v4.4.1 (c) 2011 Gary Court. License: http://github.com/garycourt/uri-js */
-
-axe-core/axe.js:
-  /*! axe v4.13.0
-   * Copyright (c) 2015 - 2026 Deque Systems, Inc.
-   *
-   * Your use of this Source Code Form is subject to the terms of the Mozilla Public
-   * License, v. 2.0. If a copy of the MPL was not distributed with this
-   * file, You can obtain one at http://mozilla.org/MPL/2.0/.
-   *
-   * This entire copyright notice must appear in every copy of this file you
-   * distribute or in any file that contains substantial portions of this source
-   * code.
-   */
-
-string.prototype.includes/implementation.js:
-string.prototype.includes/polyfill.js:
-string.prototype.includes/shim.js:
-string.prototype.includes/index.js:
-  /*! https://mths.be/includes v2.0.0 by @mathias */
-
-language-tags/lib/Subtag.js:
-language-tags/lib/Tag.js:
-language-tags/lib/index.js:
-  /**
-   * @author Matthew Caruana Galizia <mattcg@gmail.com>
-   * @license MIT: http://mattcg.mit-license.org/
-   * @copyright Copyright (c) 2013, Matthew Caruana Galizia
-   */
 
 typescript/lib/typescript.js:
 typescript/lib/tsserverlibrary.js:

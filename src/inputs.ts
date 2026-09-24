@@ -1,5 +1,4 @@
 import * as core from '@actions/core';
-import { IMPACTS, type Impact } from './types.js';
 
 export type Mode = 'static' | 'theme' | 'runtime';
 const MODES: readonly Mode[] = ['static', 'theme', 'runtime'];
@@ -9,7 +8,8 @@ const RESERVED_INPUTS = ['baseline'];
 
 export interface Inputs {
   modes: Mode[];
-  failOn: Impact;
+  /** Raw fail-on input; validated with the config, which may also set it. */
+  failOn: string;
   changedOnly: boolean;
   include: string[];
   exclude: string[];
@@ -76,10 +76,8 @@ export function readInputs(): Inputs {
     }
   }
 
-  const failOn = (core.getInput('fail-on') || 'serious').toLowerCase() as Impact;
-  if (!IMPACTS.includes(failOn)) {
-    throw new Error(`Input "fail-on" must be one of ${IMPACTS.join(', ')}, got "${failOn}".`);
-  }
+  // Empty means "not set": the config file's failOn applies, then the default (serious).
+  const failOn = core.getInput('fail-on');
 
   const maxAnnotations = Number(core.getInput('max-annotations') || '50');
   if (!Number.isInteger(maxAnnotations) || maxAnnotations < 0) {

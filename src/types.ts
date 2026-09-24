@@ -1,12 +1,9 @@
-import type { Impact } from 'eslint-plugin-antd-a11y';
+import { engine, type Impact } from 'eslint-plugin-antd-a11y';
 
 export type { Impact };
+export type RuleInfo = engine.RuleInfo;
 
-export const IMPACTS: readonly Impact[] = ['minor', 'moderate', 'serious', 'critical'];
-
-export function impactRank(impact: Impact): number {
-  return IMPACTS.indexOf(impact);
-}
+export const { IMPACTS, impactRank } = engine;
 
 export interface Finding {
   /** Repo-relative, forward slashes. Absent for runtime findings that could not be tied to source. */
@@ -25,14 +22,6 @@ export interface Finding {
   impact: Impact;
   /** At or above the `fail-on` threshold. */
   blocking: boolean;
-}
-
-export interface RuleInfo {
-  id: string;
-  description: string;
-  helpUri?: string;
-  wcag: string[];
-  impact: Impact;
 }
 
 export interface ScanResult {

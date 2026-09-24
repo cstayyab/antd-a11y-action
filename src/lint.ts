@@ -2,98 +2,31 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
-import antdA11y from 'eslint-plugin-antd-a11y';
-import jsxA11y from 'eslint-plugin-jsx-a11y';
-import { ConfigError, eslintRules, type ActionConfig } from './config.js';
-import { wrapPlugin } from './jsx-a11y-filters.js';
-import { blockingFor, impactFor, isA11yRule, ruleInfo } from './severity.js';
+import { engine } from 'eslint-plugin-antd-a11y';
+import { ConfigError, type ActionConfig } from './config.js';
+import { ruleInfo } from './severity.js';
 import type { Finding, Impact, ScanResult } from './types.js';
 
-export const SOURCE_EXTENSIONS = ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'mts', 'cts'];
+export const { SOURCE_EXTENSIONS, parseIgnoreDirectives } = engine;
 
 export interface LintOptions {
   config: ActionConfig;
-  failOn: Impact;
+  failOn: Impact | 'none';
 }
 
-// jsx-a11y rules run through filters for patterns they can't see through (spreads, conditional
-// roles, keyboard-handling roles), whatever options the user gives them.
-const wrappedJsxA11y = wrapPlugin(jsxA11y);
-
+/** The ESLint config the action lints with: the plugin's own, plus the TypeScript parser. */
 export function buildConfig(config: ActionConfig): Linter.Config[] {
-  const rules = eslintRules(config);
-  const { components, polymorphicPropName, attributes } = config.settings;
-  return [
-    {
-      files: [`**/*.{${SOURCE_EXTENSIONS.join(',')}}`],
-      languageOptions: {
-        parser: tsParser as Linter.Parser,
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        parserOptions: { ecmaFeatures: { jsx: true } },
-      },
-      linterOptions: { reportUnusedDisableDirectives: 'off' },
-      // Registered even with the preset off, so a rule a user turns on individually still resolves.
-      plugins: { 'antd-a11y': antdA11y, 'jsx-a11y': wrappedJsxA11y } as unknown as Linter.Config['plugins'],
-      settings: {
-        'antd-a11y': { aliases: config.aliases },
-        'jsx-a11y': {
-          components,
-          ...(polymorphicPropName ? { polymorphicPropName } : {}),
-          ...(attributes ? { attributes } : {}),
-        },
-      },
-      rules,
-    },
-  ];
-}
-
-// `// a11y-ignore`, `/* a11y-ignore icon-button-has-name */`, `{/* a11y-ignore jsx-a11y/alt-text, picker-has-name */}`,
-// and block comments over several lines, which usually carry the reason:
-//   {/* a11y-ignore popup-trigger-focusable -- the radio card is the focus stop,
-//       and a visually hidden sibling carries the text */}
-const COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
-const DIRECTIVE = /^(?:\/\/|\/\*)\s*a11y-ignore\b([\s\S]*?)(?:\*\/)?$/;
-
-interface IgnoreDirective {
-  rules: string[] | null; // null = every rule
-}
-
-/**
- * Lines that carry an a11y-ignore directive. A directive covers its own line and the next one; a block
- * comment over several lines counts on the line where it ends too, so it covers the element right after it.
- */
-export function parseIgnoreDirectives(code: string): Map<number, IgnoreDirective> {
-  const directives = new Map<number, IgnoreDirective>();
-  const lineAt = (index: number) => code.slice(0, index).split('\n').length;
-  for (const match of code.matchAll(COMMENT)) {
-    const directive = DIRECTIVE.exec(match[0]);
-    if (!directive) continue;
-    const list = directive[1]
-      .replace(/--[\s\S]*$/, '') // allow "a11y-ignore rule -- reason", the reason on as many lines as it needs
-      .split(/[\s,]+/)
-      .filter(Boolean);
-    const entry = { rules: list.length > 0 ? list : null };
-    directives.set(lineAt(match.index), entry);
-    directives.set(lineAt(match.index + match[0].length), entry);
-  }
-  return directives;
-}
-
-function isIgnored(directives: Map<number, IgnoreDirective>, line: number, ruleId: string): boolean {
-  for (const candidate of [line, line - 1]) {
-    const directive = directives.get(candidate);
-    if (!directive) continue;
-    if (directive.rules === null) return true;
-    const short = ruleId.replace(/^antd-a11y\//, '');
-    if (directive.rules.some((r) => r === ruleId || r === short)) return true;
-  }
-  return false;
+  return engine.buildFlatConfig(config, {
+    parser: tsParser as Linter.Parser,
+    linterOptions: { reportUnusedDisableDirectives: 'off' },
+  });
 }
 
 export class A11yLinter {
   private readonly linter = new Linter({ configType: 'flat' });
   private readonly config: Linter.Config[];
+  /** Alias names that appear as a JSX tag in at least one scanned file. */
+  readonly usedAliases = new Set<string>();
 
   constructor(private readonly options: LintOptions) {
     this.config = buildConfig(options.config);
@@ -106,9 +39,6 @@ export class A11yLinter {
   }
 
   /** Lints one file's source. `file` is the repo-relative path used in reports. */
-  /** Alias names that appear as a JSX tag in at least one scanned file. */
-  readonly usedAliases = new Set<string>();
-
   lintSource(file: string, code: string, result: ScanResult): void {
     for (const name of Object.keys(this.options.config.aliases)) {
       if (!this.usedAliases.has(name) && new RegExp(`<${name.replace(/\./g, '\\.')}[\\s/>]`).test(code)) {
@@ -119,26 +49,16 @@ export class A11yLinter {
     // Present at runtime since ESLint 8.8, missing from the published types.
     const suppressedMessages = (this.linter as Linter & { getSuppressedMessages(): Linter.LintMessage[] })
       .getSuppressedMessages();
-    result.suppressed += suppressedMessages.filter((m) => isA11yRule(m.ruleId)).length;
+    result.suppressed += suppressedMessages.filter((m) => engine.isA11yRule(m.ruleId)).length;
 
-    const directives = parseIgnoreDirectives(code);
-    // Where an antd-a11y rule reported, it's the more precise (DOM-verified) finding: drop a jsx-a11y
-    // report on the same element, e.g. control-has-associated-label on a mapped antd Button.
-    const antdAt = new Set(
-      messages.filter((m) => m.ruleId?.startsWith('antd-a11y/')).map((m) => `${m.line}:${m.column}`),
-    );
-    for (const message of messages) {
-      if (message.fatal) {
-        result.parseErrors.push({ file, line: message.line, message: message.message });
-        continue;
-      }
-      if (!isA11yRule(message.ruleId)) continue;
-      if (message.ruleId.startsWith('jsx-a11y/') && antdAt.has(`${message.line}:${message.column}`)) continue;
-      if (isIgnored(directives, message.line, message.ruleId)) {
-        result.suppressed += 1;
-        continue;
-      }
-      const impact = impactFor(message.ruleId, message.messageId);
+    // The same step the plugin's processor runs in a local ESLint: dedupe, a11y-ignore, blocking.
+    const evaluation = engine.evaluateMessages(messages, code, this.options);
+    result.suppressed += evaluation.ignored;
+    for (const message of evaluation.other) {
+      if (message.fatal) result.parseErrors.push({ file, line: message.line, message: message.message });
+    }
+    for (const { message, impact, blocking } of evaluation.findings) {
+      if (!result.rules.has(message.ruleId)) result.rules.set(message.ruleId, ruleInfo(message.ruleId));
       const finding: Finding = {
         file,
         line: message.line,
@@ -148,10 +68,9 @@ export class A11yLinter {
         ruleId: message.ruleId,
         message: message.message,
         impact,
-        blocking: blockingFor(message.ruleId, impact, this.options.failOn, this.options.config.rules),
+        blocking,
+        wcag: result.rules.get(message.ruleId)!.wcag,
       };
-      if (!result.rules.has(message.ruleId)) result.rules.set(message.ruleId, ruleInfo(message.ruleId));
-      finding.wcag = result.rules.get(message.ruleId)!.wcag;
       result.findings.push(finding);
     }
     result.filesScanned += 1;

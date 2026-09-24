@@ -41,6 +41,7 @@ export async function run(): Promise<void> {
   core.info(`Scanning ${files.length} files (${scope}).`);
 
   const config = resolveConfig({
+    failOn: inputs.failOn,
     jsxA11y: inputs.jsxA11y,
     rules: inputs.rules,
     components: inputs.components,
@@ -50,7 +51,8 @@ export async function run(): Promise<void> {
   });
   if (config.file) core.info(`Using ${config.file}.`);
   for (const warning of configWarnings(config)) core.warning(warning);
-  const linter = new A11yLinter({ config, failOn: inputs.failOn });
+  const failOn = config.failOn ?? 'serious';
+  const linter = new A11yLinter({ config, failOn });
   const result = await linter.lintFiles(workspace, files);
   const aliasNames = Object.keys(config.aliases);
   if (aliasNames.length) core.info(`Checking ${aliasNames.length} wrapper ${aliasNames.length === 1 ? 'alias' : 'aliases'}: ${aliasNames.join(', ')}.`);
@@ -66,7 +68,7 @@ export async function run(): Promise<void> {
 
   const sarifPath = path.resolve(workspace, inputs.sarifFile);
   await mkdir(path.dirname(sarifPath), { recursive: true });
-  await writeFile(sarifPath, `${JSON.stringify(toSarif(result, inputs.failOn, VERSION), null, 2)}\n`);
+  await writeFile(sarifPath, `${JSON.stringify(toSarif(result, failOn, VERSION), null, 2)}\n`);
   core.info(`Wrote SARIF to ${sarifPath}`);
 
   const sha = pr?.headSha ?? context.sha;
@@ -75,7 +77,7 @@ export async function run(): Promise<void> {
   const repository = process.env.GITHUB_REPOSITORY;
   const blobBase = repository && sha ? `${serverUrl}/${repository}/blob/${sha}` : undefined;
   const markdown = renderMarkdown(result, {
-    failOn: inputs.failOn,
+    failOn,
     blobBase,
     scope,
     overrides: overridesNote(config, ['antd-a11y/', 'jsx-a11y/']),
@@ -94,9 +96,9 @@ export async function run(): Promise<void> {
 
   if (blocking > 0) {
     core.setFailed(
-      `${blocking} accessibility ${blocking === 1 ? 'issue' : 'issues'} at or above "${inputs.failOn}" impact.`,
+      `${blocking} accessibility ${blocking === 1 ? 'issue' : 'issues'} at or above "${failOn}" impact.`,
     );
   } else {
-    core.info(`No issues at or above "${inputs.failOn}" (${result.findings.length} total findings).`);
+    core.info(`No issues at or above "${failOn}" (${result.findings.length} total findings).`);
   }
 }

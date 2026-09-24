@@ -53,7 +53,7 @@ Nothing to install: the action ships its own parser and rules and ignores your E
 
 Every finding names the WCAG 2.2 success criteria it fails, with level and a link to W3C's Understanding page: in the annotation, the PR comment's WCAG column, and the SARIF rule help. Runtime axe findings take theirs from axe's own tags.
 
-Impact uses axe-core's scale, and `fail-on` (default `serious`) decides what blocks the PR. Anything below the threshold still appears as a warning, in SARIF, and in the PR comment.
+Impact uses axe-core's scale, and `fail-on` (default `serious`, or `failOn` in the [config file](#configuration)) decides what blocks the PR. Anything below the threshold still appears as a warning, in SARIF, and in the PR comment.
 
 **Built to stay quiet when unsure.** A rule only reports on components it can trace back to an `antd` import (named, aliased, namespace, `antd/es/*`, or `const { Item } = Form`). In-house wrappers around antd components are invisible to the rules until you declare them; see [Wrapper components](#wrapper-components). Spread props, `id`s and custom children count as "may be labelled". Each rule's claim about antd's markup is also checked in CI by rendering real antd and inspecting the DOM (`packages/eslint-plugin-antd-a11y/tests/dom`).
 
@@ -76,7 +76,7 @@ When an antd rule and a jsx-a11y rule flag the same element, only the antd findi
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `fail-on` | `serious` | Lowest impact that fails the check: `minor`, `moderate`, `serious`, `critical` |
+| `fail-on` | | Lowest impact that fails the check: `minor`, `moderate`, `serious`, `critical` or `none`. Empty uses the config file's `failOn`, then `serious`. |
 | `changed-only` | `true` | On `pull_request` events, scan only files the PR adds or modifies. Other events scan everything. |
 | `include` | `**/*.{js,jsx,ts,tsx}` | Globs relative to `working-directory` (comma or newline separated) |
 | `exclude` | | Globs to skip. `node_modules`, `dist`, `build`, `coverage`, `.next` and `*.d.ts` are always skipped. |
@@ -122,6 +122,7 @@ For rule options and jsx-a11y settings, use a config file. The action reads `.gi
 ```json
 {
   "jsxA11y": "recommended",
+  "failOn": "serious",
   "rules": {
     "jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }],
     "jsx-a11y/anchor-is-valid": "off",
@@ -135,7 +136,7 @@ For rule options and jsx-a11y settings, use a config file. The action reads `.gi
 }
 ```
 
-Rules take a severity, or `[severity, options]` as in ESLint. The options go to the rule unchanged; only antd-a11y and jsx-a11y rules take them. Unlike ESLint, a bare severity keeps the options the preset sets (recommended's exemptions for `onLoad` on `img`, expression values for `tabIndex`), so `"warn"` never makes a rule stricter. `settings` is jsx-a11y's (`components`, `polymorphicPropName`, `attributes`). Workflow inputs override the file, and the file overrides the defaults. The runtime action reads the same file's `runtime/*` and `axe/*` rules.
+Rules take a severity, or `[severity, options]` as in ESLint. The options go to the rule unchanged; only antd-a11y and jsx-a11y rules take them. Unlike ESLint, a bare severity keeps the options the preset sets (recommended's exemptions for `onLoad` on `img`, expression values for `tabIndex`), so `"warn"` never makes a rule stricter. `settings` is jsx-a11y's (`components`, `polymorphicPropName`, `attributes`). `failOn` sets the blocking threshold for the static check; keeping it in the file (rather than the `fail-on` input) means a [local ESLint run](#run-it-locally-with-eslint) blocks on the same findings. Workflow inputs override the file, and the file overrides the defaults. The runtime action reads the same file's `runtime/*` and `axe/*` rules.
 
 Guardrails:
 
@@ -361,16 +362,44 @@ An `a11y-ignore` comment covers its own line and the next one. Name rules to ign
 
 The PR comment shows how many findings were suppressed.
 
-## Using the rules in your editor
+## Run it locally with ESLint
 
-The rules are also published as a standalone ESLint plugin, so you can catch the same problems before they reach a PR:
+> The plugin isn't on npm yet; publishing it is tracked in [#3](https://github.com/cstayyab/antd-a11y-action/issues/3). The setup below is what it will look like.
+
+The action's static check is built on `eslint-plugin-antd-a11y`, and the plugin can run the same check in your editor, in a pre-push hook, or with `npx eslint`. It uses the same rules, `.github/antd-a11y.json`, jsx-a11y tuning and filters, aliases, `a11y-ignore` comments and blocking threshold, so a clean local run means a clean PR check.
 
 ```js
 // eslint.config.js
 import antdA11y from 'eslint-plugin-antd-a11y';
+import tseslint from 'typescript-eslint';
 
-export default [antdA11y.configs.recommended];
+export default [
+  // Your TypeScript setup provides the parser for .ts/.tsx files.
+  ...tseslint.configs.recommended,
+  ...antdA11y.config(),
+];
 ```
+
+`antdA11y.config()` reads `.github/antd-a11y.json` from the current directory, the same file the action reads. It reports each finding by whether it would block the PR check:
+- **error:** at or above `failOn`, or set to `error` in `rules`
+- **warning:** everything else
+
+`eslint` therefore exits non-zero exactly when the PR check would fail. It also drops the jsx-a11y duplicate of an antd finding and applies `a11y-ignore`, as the action does. A CI test lints the fixture app both ways and checks the results are identical.
+
+Options override the file in the same order the action's inputs do: `configFile` (a path, or `false` to skip the file), `cwd`, `failOn`, `rules`, `aliases`, `settings`, `jsxA11y`, `files`, `parser` and `processor`. For example, in a monorepo package: `antdA11y.config({ configFile: '../../.github/antd-a11y.json' })`.
+
+To block a push on it, run it from a git hook (husky, lefthook) or an npm script; warnings are printed but only errors fail:
+
+```json
+{ "scripts": { "a11y": "eslint src" } }
+```
+
+**Limits:**
+- **Flat config only (ESLint 9).** The legacy `plugin:antd-a11y/recommended-legacy` preset has the antd rules only.
+- **One processor per file.** The deduplication, `a11y-ignore` handling and blocking-based severity run as an ESLint processor. If your config already applies another processor to `.jsx`/`.tsx` files, use `antdA11y.config({ processor: false })`: the rules, settings and filters still apply, but every finding shows as an error, and `a11y-ignore` isn't read (`eslint-disable` still works).
+- **Only the static check.** The runtime check and the theme audit need a running app or a theme, not a lint pass.
+
+For the antd rules alone, without the action's config, `antdA11y.configs.recommended` still works.
 
 ## Roadmap
 
