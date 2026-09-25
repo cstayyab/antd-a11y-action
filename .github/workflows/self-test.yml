@@ -17,7 +17,7 @@ jobs:
   self-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run antd A11y Guard on fixtures/app
         id: guard
@@ -42,7 +42,7 @@ jobs:
 
       - name: Upload SARIF to code scanning
         if: always() && steps.guard.outputs.sarif-file != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         continue-on-error: true
         with:
           sarif_file: ${{ steps.guard.outputs.sarif-file }}
@@ -59,8 +59,8 @@ jobs:
         # The fixture's lockfile pins 15.5; the 16 leg upgrades next in place.
         next: ['15.5', '16']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -127,8 +127,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm

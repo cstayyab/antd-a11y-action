@@ -135,7 +135,7 @@ runs:
       run: echo "version=$(node -p "require(process.env.GITHUB_ACTION_PATH + '/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
     - name: a11y · cache browsers
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ms-playwright
         key: antd-a11y-pw-${{ runner.os }}-${{ steps.pw.outputs.version }}
@@ -183,7 +183,7 @@ runs:
 
     - name: a11y · upload results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name }}
         path: ${{ env.A11Y_OUT }}

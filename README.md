@@ -22,10 +22,10 @@ jobs:
   antd-a11y:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: cstayyab/antd-a11y-action@v0
         id: a11y
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always() && steps.a11y.outputs.sarif-file != ''
         with:
           sarif_file: ${{ steps.a11y.outputs.sarif-file }}
@@ -225,8 +225,8 @@ The static rules read your source. The runtime check starts the app and looks at
       pull-requests: write
       security-events: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - uses: cstayyab/antd-a11y-action/runtime@v0
@@ -239,7 +239,7 @@ The static rules read your source. The runtime check starts the app and looks at
           exclude-routes: |
             ^/admin
           interactions: .github/a11y-interactions.mjs
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always() && steps.runtime.outputs.sarif-file != ''
         with:
           sarif_file: ${{ steps.runtime.outputs.sarif-file }}
