@@ -71,6 +71,70 @@ jobs:
           sarif_file: ${{ steps.guard.outputs.sarif-file }}
           category: antd-a11y-self-test
 
+  # The baseline against fixtures/baseline-app, a package in a monorepo, with a partial baseline: two
+  # of three identical findings, one finding left out, an entry for a deleted file and one for another
+  # package (which this job must leave alone). Then a committed rename, which must stay baselined.
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check against the baseline
+        id: guard
+        uses: ./
+        continue-on-error: true
+        with:
+          working-directory: fixtures/baseline-app
+          changed-only: false
+          comment: false
+          baseline: fixtures/baseline-app/antd-a11y-baseline.json
+          baseline-age-warning: 90
+          sarif-file: antd-a11y-baseline.sarif
+
+      - name: Check the results
+        env:
+          OUTCOME: ${{ steps.guard.outcome }}
+          VIOLATIONS: ${{ steps.guard.outputs.violations }}
+          BLOCKING: ${{ steps.guard.outputs.blocking-violations }}
+          BASELINED: ${{ steps.guard.outputs.baselined }}
+          FIXED: ${{ steps.guard.outputs.fixed }}
+          OLDEST: ${{ steps.guard.outputs.baseline-oldest }}
+          AGED: ${{ steps.guard.outputs.baseline-aged }}
+        run: |
+          echo "outcome=$OUTCOME violations=$VIOLATIONS blocking=$BLOCKING baselined=$BASELINED fixed=$FIXED oldest=$OLDEST aged=$AGED"
+          test "$OUTCOME" = "failure"
+          test "$VIOLATIONS" = "6"
+          test "$BLOCKING" = "2"
+          test "$BASELINED" = "4"
+          test "$FIXED" = "1"
+          test "$OLDEST" = "2025-01-15"
+          test "$AGED" = "1"
+
+      - name: Shrink leaves the other package's entry and adds nothing
+        run: |
+          env INPUT_MODE=static 'INPUT_WORKING-DIRECTORY=fixtures/baseline-app' 'INPUT_CHANGED-ONLY=false' \
+            INPUT_COMMENT=false INPUT_BASELINE=fixtures/baseline-app/antd-a11y-baseline.json 'INPUT_BASELINE-UPDATE=shrink' \
+            'INPUT_SARIF-FILE=shrink.sarif' GITHUB_OUTPUT=/dev/null node dist/index.mjs
+          node -e "
+            const { entries } = require('./fixtures/baseline-app/antd-a11y-baseline.json');
+            const got = entries.map((e) => e.file.split('/').pop() + ':' + e.count).join(' ');
+            console.log(got);
+            if (got !== 'Orders.tsx:1 Page.tsx:2 Page.tsx:1 Settings.tsx:1') process.exit(1);
+          "
+          git checkout -- fixtures/baseline-app/antd-a11y-baseline.json
+
+      - name: A renamed file stays baselined (push run, renames from the last commit)
+        run: |
+          git -c user.name=self-test -c user.email=self-test@example.com mv fixtures/baseline-app/src/Orders.tsx fixtures/baseline-app/src/OrdersPage.tsx
+          git -c user.name=self-test -c user.email=self-test@example.com commit -qm "Rename Orders"
+          echo '{}' > "$RUNNER_TEMP/push-event.json"
+          : > "$RUNNER_TEMP/out.txt"
+          env GITHUB_EVENT_NAME=push GITHUB_EVENT_PATH="$RUNNER_TEMP/push-event.json" GITHUB_OUTPUT="$RUNNER_TEMP/out.txt" \
+            INPUT_MODE=static 'INPUT_WORKING-DIRECTORY=fixtures/baseline-app' 'INPUT_CHANGED-ONLY=false' INPUT_COMMENT=false \
+            INPUT_BASELINE=fixtures/baseline-app/antd-a11y-baseline.json 'INPUT_SARIF-FILE=rename.sarif' node dist/index.mjs || true
+          grep -A1 '^baselined<<' "$RUNNER_TEMP/out.txt" | sed -n 2p | grep -qx 4
+          grep -A1 '^blocking-violations<<' "$RUNNER_TEMP/out.txt" | sed -n 2p | grep -qx 2
+
   # Runtime sub-action against fixtures/next-app (Next 15.5, React 19, antd 6).
   runtime-next:
     name: runtime-next (next ${{ matrix.next }})

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "tool": "antd-a11y-action",
+  "entries": [
+    {
+      "file": "fixtures/baseline-app/src/Deleted.tsx",
+      "rule": "antd-a11y/modal-has-title",
+      "fingerprint": "d7dfc5d8a6",
+      "count": 1,
+      "added": "2026-09-30"
+    },
+    {
+      "file": "fixtures/baseline-app/src/Orders.tsx",
+      "rule": "antd-a11y/image-has-alt",
+      "fingerprint": "955027fbf6",
+      "count": 1,
+      "added": "2026-09-30"
+    },
+    {
+      "file": "fixtures/baseline-app/src/Page.tsx",
+      "rule": "antd-a11y/form-control-has-name",
+      "fingerprint": "0fa01e0191",
+      "count": 2,
+      "added": "2026-09-30"
+    },
+    {
+      "file": "fixtures/baseline-app/src/Page.tsx",
+      "rule": "antd-a11y/modal-has-title",
+      "fingerprint": "d7dfc5d8a6",
+      "count": 1,
+      "added": "2025-01-15"
+    },
+    {
+      "file": "fixtures/other-app/src/Settings.tsx",
+      "rule": "antd-a11y/modal-has-title",
+      "fingerprint": "0123456789",
+      "count": 1,
+      "added": "2026-09-30"
+    }
+  ]
+}

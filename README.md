@@ -6,7 +6,7 @@ Read why that gap exists, with examples: [Why axe and jsx-a11y miss Ant Design a
 
 > Three layers: the **static** action (10 antd rules plus jsx-a11y's recommended set, on changed files), the **[theme contrast audit](#theme-contrast-audit)** (`mode: theme`: every colour your antd theme derives, checked against WCAG in every state), and the **[runtime check](#runtime-check)** sub-action (starts your app, crawls routes with Playwright + axe, and in Next.js apps blames issues on the source line that rendered them). All report through inline annotations, SARIF for Code Scanning and a sticky PR comment. The static check also runs **[locally through ESLint](#run-it-locally-with-eslint)**, with the same results, so you can catch issues before pushing.
 
-> **Beta (0.x).** `@v0` is a branch that moves to each 0.x release, so pinning it gets fixes automatically. To stay on one version, pin a release tag (`@v0.11.0`) or a commit SHA. Inputs may still change between minor versions until 1.0, which ships once the baseline file lands; see [Roadmap](#roadmap) and the release notes before upgrading.
+> **Beta (0.x).** `@v0` is a branch that moves to each 0.x release, so pinning it gets fixes automatically. To stay on one version, pin a release tag (`@v0.11.0`) or a commit SHA. Inputs may still change between minor versions until 1.0, which ships once the baseline file is released; see [Roadmap](#roadmap) and the release notes before upgrading.
 
 ## Quick start
 
@@ -94,12 +94,16 @@ When an antd rule and a jsx-a11y rule flag the same element, only the antd findi
 | `sarif-file` | `antd-a11y.sarif` | Where to write the SARIF report |
 | `max-annotations` | `50` | Cap on inline annotations |
 | `github-token` | `${{ github.token }}` | Used to list PR files and write the comment |
+| `baseline` | | A [baseline file](#adopting-on-an-existing-codebase-the-baseline) of known findings, e.g. `.github/antd-a11y-baseline.json`. They are reported but don't block; only new ones do. Empty uses the config file's `baseline`. |
+| `baseline-update` | `false` | `shrink` removes fixed entries and never adds any; `full` rewrites this working directory's entries from the scan (needs `changed-only: false`). Either writes the file, uploads it as an artifact, and blocks nothing. |
+| `baseline-strict` | `false` | Fail when the baseline has entries that are already fixed, including entries for deleted files. |
+| `baseline-age-warning` | | Days. Warn about baselined entries older than this. Never fails the check. |
 | `mode` | `static` | Layers to run, comma separated: `static`, `theme` (the [theme contrast audit](#theme-contrast-audit)). `runtime` is the separate sub-action. |
 | `theme-config` | | `mode: theme`: a module that exports your theme (`src/theme.ts`, or `src/theme.ts#dark` for a named export), for themes built with functions or imports. **Runs repository code**; see [Theme contrast audit](#theme-contrast-audit). |
 
-`baseline` is reserved for the baseline layer and ignored for now. The runtime check is a separate step; see below.
+The runtime check is a separate step; see below.
 
-**Outputs:** `violations`, `blocking-violations`, `sarif-file`.
+**Outputs:** `violations`, `blocking-violations` (new findings that block), `sarif-file`. With a baseline: `baselined`, `fixed`, `baseline-oldest` (the oldest `added` date among baselined entries), `baseline-aged` (entries past `baseline-age-warning`) and, in update runs, `baseline-file`.
 
 ## Configuration
 
@@ -393,6 +397,75 @@ Translucent colours are composited over their real background first. Disabled co
 
 **Not covered:** CSS outside the token system (hand-written styles, CSS modules, `style` props, images, gradients); the runtime check's axe run covers what renders. antd 4 (Less variables) is out of scope, as it is for the static rules.
 
+## Adopting on an existing codebase: the baseline
+
+Turning the action on in an existing codebase surfaces every existing issue at once, and a PR that touches a file answers for all of them. A baseline records the findings you already have, so a PR only fails on the ones it adds. Known findings stay visible in the PR comment, and as they are fixed they drop out, so the backlog can only shrink.
+
+**1. Create it once** (e.g. from `workflow_dispatch`) and commit the file the step writes:
+
+```yaml
+- uses: cstayyab/antd-a11y-action@v0
+  with:
+    changed-only: false
+    baseline: .github/antd-a11y-baseline.json
+    baseline-update: full
+```
+
+The file is written to the workspace and uploaded as the `antd-a11y-baseline` artifact. Commit it in a later step, or download it and commit it yourself; the action never commits or pushes.
+
+**2. Enforce it on pull requests.** Set `baseline` on the PR check (or put `"baseline": ".github/antd-a11y-baseline.json"` in the [config file](#configuration), which local ESLint runs read too):
+
+```yaml
+- uses: cstayyab/antd-a11y-action@v0
+  with:
+    baseline: .github/antd-a11y-baseline.json
+    baseline-age-warning: 90
+```
+
+- A finding that matches a baseline entry is **baselined**: reported, never blocking.
+- One that doesn't is **new**, and follows `fail-on` and `rules` as usual.
+- An entry with no matching finding in a scanned file is **fixed**; the comment lists it as ready to remove.
+
+The PR comment shows "3 new · 41 baselined (oldest 8 months) · 2 fixed", with baselined findings in a collapsed section. Annotations only mark new findings, and SARIF results carry `baselineState` (`new` or `unchanged`), so Code Scanning can tell them apart. `baseline-age-warning: 90` adds a warning such as "34 of 41 baselined entries are older than 90 days". It never fails the check, because an entry's age isn't something the PR that touches it created.
+
+**3. Shrink it on every push to the default branch**, then commit the file in a later step (or open a PR with it):
+
+```yaml
+- uses: cstayyab/antd-a11y-action@v0
+  with:
+    changed-only: false
+    baseline: .github/antd-a11y-baseline.json
+    baseline-update: shrink
+```
+
+`shrink` only removes fixed entries and never adds one. The only way an entry is added is a `full` run, which you run on purpose: a finding a PR introduces fails the check. `baseline-strict: true` makes the PR check fail while the baseline still lists fixed entries, including entries for deleted files.
+
+**How findings are matched.** An entry is a file, a rule and a fingerprint of the flagged element: its tag and the attributes that matter for accessibility (`aria-*`, `role`, `label`, `title`, `alt`, `disabled`, `tabIndex`, `placeholder`, `autoComplete` and similar, plus props your [aliases](#wrapper-components) read), with a count per fingerprint.
+- Code moving, reformatting, or editing an unrelated prop (`className`, `onClick`) keeps the fingerprint.
+- Editing what the rules look at changes it, so the element is re-checked. For example, fixing `autoComplete` on a password field makes its paste-blocking finding new, since that element was edited for the same rule.
+- Four identical unnamed `InputNumber`s share one entry with `count: 4`. A fifth makes one new finding; removing one makes one fixed; reordering changes nothing.
+- Theme audit findings are keyed by the configuration's variant (light, dark), the rule and the tokens, so a colour change in the same pair keeps its entry.
+
+**Renamed and moved files** keep their entries. On pull requests the action reads renames from the PR's file list. On push and `workflow_dispatch` runs it uses `git diff -M` against the previous commit, which needs `actions/checkout` with `fetch-depth: 2`; without it, it warns and a renamed file's findings count as new (and the old path's as fixed). A file that is renamed and heavily edited counts as a new file, since git no longer sees a rename.
+
+**Monorepos.** Entry paths are relative to the repository root, whatever `working-directory` is. Either give each package its own file (`apps/web/.github/antd-a11y-baseline.json`), or share one: each job then reads and updates only the entries under its own `working-directory`. Run updates to a shared file one job at a time (`max-parallel: 1`), since two jobs writing the same file would conflict.
+
+**The file** is sorted and pretty-printed, with no line numbers or messages, so it doesn't churn when code moves and merge conflicts are rare:
+
+```json
+{
+  "version": 1,
+  "tool": "antd-a11y-action",
+  "entries": [
+    { "file": "apps/web/src/pages/Orders.tsx", "rule": "antd-a11y/modal-has-title", "fingerprint": "3f9c2a1e0b", "count": 1, "added": "2026-09-24" }
+  ]
+}
+```
+
+`added` is the date the entry first appeared; `full` keeps it for entries that are still present, so the age of the debt survives a rewrite. A missing file means every finding is new. A malformed file fails the step, and so does a file from a newer version of the action, with a message to upgrade. Runtime check findings aren't baselined yet.
+
+Compared with the other ways to live with a backlog: `rules: … warn` lets *new* violations of that rule through as well, and `a11y-ignore` comments hide the backlog and are rarely removed. A baseline keeps every rule at full strength for new code.
+
 ## Suppressing a finding
 
 ```jsx
@@ -444,7 +517,9 @@ export default [
 
 `eslint` therefore exits non-zero exactly when the PR check would fail. It also drops the jsx-a11y duplicate of an antd finding and applies `a11y-ignore`, as the action does. A CI test lints the fixture app both ways and checks the results are identical.
 
-Options override the file in the same order the action's inputs do: `configFile` (a path, or `false` to skip the file), `cwd`, `failOn`, `rules`, `aliases`, `settings`, `jsxA11y`, `files`, `parser` and `processor`. For example, in a monorepo package: `antdA11y.config({ configFile: '../../.github/antd-a11y.json' })`.
+With a [baseline](#adopting-on-an-existing-codebase-the-baseline) set (`"baseline"` in the config file, or the `baseline` option), a finding in it is a warning with "(in the baseline)" after its message, since the PR check never blocks on it. Its paths are relative to `cwd`, which should be the repository root.
+
+Options override the file in the same order the action's inputs do: `configFile` (a path, or `false` to skip the file), `cwd`, `failOn`, `rules`, `aliases`, `settings`, `jsxA11y`, `baseline`, `files`, `parser` and `processor`. For example, in a monorepo package: `antdA11y.config({ configFile: '../../.github/antd-a11y.json' })`.
 
 To block a push on it, run it from a git hook (husky, lefthook) or an npm script; warnings are printed but only errors fail:
 
@@ -464,7 +539,7 @@ For the antd rules alone, without the action's config, `antdA11y.configs.recomme
 | Phase | Scope |
 | --- | --- |
 | **MVP** | 10 static antd rules, SARIF, sticky PR comment, changed-files mode |
-| **v1 (in progress)** | Done: runtime check (Next.js guard + axe, generic axe crawl) with sign-in and redirect detection (0.9.0); WCAG criteria on every finding and per-rule configuration (0.9.1); wrapper component aliases (0.9.2, refined in 0.9.3); the same check locally through ESLint (0.10.0); theme contrast audit (0.11.0). Next: [baseline file](https://github.com/cstayyab/antd-a11y-action/issues/1), Storybook stories |
+| **v1 (in progress)** | Done: runtime check (Next.js guard + axe, generic axe crawl) with sign-in and redirect detection (0.9.0); WCAG criteria on every finding and per-rule configuration (0.9.1); wrapper component aliases (0.9.2, refined in 0.9.3); the same check locally through ESLint (0.10.0); theme contrast audit (0.11.0); baseline file (next release). Next: Storybook stories, a baseline for runtime findings |
 | v1.1 | WCAG 2.2 runtime checks (focus not obscured, target size) |
 | v2 | Autofix via suggested changes, antd v4 support |
 

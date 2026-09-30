@@ -1,0 +1,9 @@
+{
+  "name": "antd-a11y-fixture-baseline-app",
+  "private": true,
+  "description": "Files the self-test's baseline job scans, as a package in a monorepo. Never built or installed.",
+  "dependencies": {
+    "antd": "^6.6.5",
+    "react": "^18.3.1"
+  }
+}

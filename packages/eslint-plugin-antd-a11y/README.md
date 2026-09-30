@@ -30,6 +30,7 @@ A processor then does what the action does after linting:
 - drops a jsx-a11y finding on the same element as an antd finding
 - applies `a11y-ignore` comments
 - reports each finding as an **error** if it would block the PR check, or a **warning** if not
+- with a [baseline file](https://github.com/cstayyab/antd-a11y-action#adopting-on-an-existing-codebase-the-baseline), reports the findings in it as warnings, since they never block the PR check
 
 `eslint` exits non-zero exactly when the PR check would fail. A CI test in the action's repo lints its fixture app both ways and checks the results are identical.
 
@@ -41,6 +42,7 @@ Options override the config file:
 | `cwd` | `process.cwd()` | |
 | `failOn` | `serious` | `minor`, `moderate`, `serious`, `critical` or `none` |
 | `rules`, `aliases`, `settings`, `jsxA11y` | | Same shape as the config file |
+| `baseline` | | Baseline file, relative to `cwd` (the repository root) |
 | `files` | all JS/TS extensions | |
 | `parser` | | Usually set by your TypeScript config instead |
 | `processor` | `true` | `false` if another processor already handles `.jsx`/`.tsx`. Every finding then shows as an error, and `a11y-ignore` isn't read. |
