@@ -40,6 +40,29 @@ jobs:
           test "$VIOLATIONS" = "22"
           test "$BLOCKING" = "18"
 
+      # The theme audit on the fixture's ConfigProvider theme, with the bundled antd (no npm ci here).
+      - name: Run the theme audit on fixtures/app
+        id: theme
+        uses: ./
+        continue-on-error: true
+        with:
+          mode: theme
+          working-directory: fixtures/app
+          changed-only: false
+          comment: false
+          sarif-file: antd-a11y-theme.sarif
+
+      - name: Check the theme results
+        env:
+          OUTCOME: ${{ steps.theme.outcome }}
+          VIOLATIONS: ${{ steps.theme.outputs.violations }}
+          BLOCKING: ${{ steps.theme.outputs.blocking-violations }}
+        run: |
+          echo "outcome=$OUTCOME violations=$VIOLATIONS blocking=$BLOCKING"
+          test "$OUTCOME" = "failure"
+          test "$VIOLATIONS" = "109"
+          test "$BLOCKING" = "29"
+
       - name: Upload SARIF to code scanning
         if: always() && steps.guard.outputs.sarif-file != ''
         uses: github/codeql-action/upload-sarif@v4

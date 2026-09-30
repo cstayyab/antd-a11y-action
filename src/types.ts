@@ -22,6 +22,8 @@ export interface Finding {
   impact: Impact;
   /** At or above the `fail-on` threshold. */
   blocking: boolean;
+  /** Theme audit findings: the configuration, and whether antd's default theme has the same problem. */
+  theme?: { configuration: string; inherited: boolean; pairIds: string[] };
 }
 
 export interface ScanResult {

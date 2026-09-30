@@ -24,6 +24,8 @@ export interface Inputs {
   /** jsx-a11y component mapping lines, "Name: tag". */
   components: string;
   aliases: string;
+  /** Module exporting the theme ("path" or "path#export"); empty means discover themes statically. */
+  themeConfig: string;
   /** JSON config file, relative to the repository root; used only if it exists. */
   configFile: string;
   maxAnnotations: number;
@@ -65,9 +67,7 @@ export function readInputs(): Inputs {
   }
   for (const mode of modes) {
     if (mode === 'runtime') {
-      core.warning('mode "runtime" runs as its own step: add `uses: cstayyab/antd-a11y-action/runtime@v0`. This step runs "static" only.');
-    } else if (mode !== 'static') {
-      core.warning(`mode "${mode}" is not available yet in this release and will be skipped. Only "static" runs.`);
+      core.warning('mode "runtime" runs as its own step: add `uses: cstayyab/antd-a11y-action/runtime@v0`. This step runs "static" and "theme" only.');
     }
   }
   for (const name of RESERVED_INPUTS) {
@@ -98,6 +98,7 @@ export function readInputs(): Inputs {
     rules: core.getInput('rules'),
     components: core.getInput('components'),
     aliases: core.getInput('aliases'),
+    themeConfig: core.getInput('theme-config'),
     configFile: core.getInput('config') || '.github/antd-a11y.json',
     maxAnnotations,
   };

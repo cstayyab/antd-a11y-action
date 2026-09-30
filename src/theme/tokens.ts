@@ -122,14 +122,14 @@ export async function loadAntd(dirs: readonly string[]): Promise<LoadedAntd> {
     const loaded = loadAntdFrom(installed);
     if (SUPPORTED_MAJORS.includes(loaded.major as 5 | 6)) return loaded;
     const fallback = await loadBundled(SUPPORTED_MAJORS.at(-1)!);
-    return { ...fallback, note: `antd ${loaded.version} is not supported by the theme audit (antd ${SUPPORTED_MAJORS.join(' and ')} are); used the bundled antd ${fallback.version}` };
+    return { ...fallback, note: `The theme audit supports antd ${SUPPORTED_MAJORS.join(' and ')}, not the repository's antd ${loaded.version}, so the bundled antd ${fallback.version} was used.` };
   }
   const declared = declaredMajor(dirs);
   const major = declared && SUPPORTED_MAJORS.includes(declared as 5 | 6) ? declared : SUPPORTED_MAJORS.at(-1)!;
   const loaded = await loadBundled(major);
   const why = declared
-    ? `antd isn't installed (run npm ci before this step to audit your exact version), so the bundled antd ${loaded.version} was used`
-    : `no antd dependency found, so the bundled antd ${loaded.version} was used`;
+    ? `The repository's antd isn't installed (run npm ci before this step to audit your exact version), so the bundled antd ${loaded.version} was used.`
+    : `No antd dependency found, so the bundled antd ${loaded.version} was used.`;
   return { ...loaded, note: why };
 }
 

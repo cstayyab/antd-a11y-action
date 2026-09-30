@@ -12,6 +12,9 @@ import { annotate } from './report/annotations.js';
 import { renderMarkdown } from './report/markdown.js';
 import { upsertComment } from './report/pr-comment.js';
 import { toSarif } from './report/sarif.js';
+import { renderThemeSection } from './report/theme.js';
+import { runThemeAudit, type ThemeAuditResult } from './theme/index.js';
+import type { ScanResult } from './types.js';
 
 export async function run(): Promise<void> {
   const inputs = readInputs();
@@ -21,7 +24,9 @@ export async function run(): Promise<void> {
   const octokit = inputs.token ? github.getOctokit(inputs.token) : null;
   const pr = pullRequestFromContext(context);
 
-  if (!inputs.modes.includes('static')) {
+  const runStatic = inputs.modes.includes('static');
+  const runTheme = inputs.modes.includes('theme');
+  if (!runStatic && !runTheme) {
     core.warning('No available mode selected; nothing to do.');
     return;
   }
@@ -38,7 +43,7 @@ export async function run(): Promise<void> {
 
   const files = filterFiles(candidates, dir, inputs.include, inputs.exclude);
   core.debug(`${candidates.length} candidates; include=${JSON.stringify(inputs.include)} exclude=${JSON.stringify(inputs.exclude)}`);
-  core.info(`Scanning ${files.length} files (${scope}).`);
+  if (runStatic) core.info(`Scanning ${files.length} files (${scope}).`);
 
   const config = resolveConfig({
     failOn: inputs.failOn,
@@ -46,21 +51,45 @@ export async function run(): Promise<void> {
     rules: inputs.rules,
     components: inputs.components,
     aliases: inputs.aliases,
+    themeConfig: inputs.themeConfig,
     configFile: inputs.configFile,
     workspace,
   });
   if (config.file) core.info(`Using ${config.file}.`);
   for (const warning of configWarnings(config)) core.warning(warning);
   const failOn = config.failOn ?? 'serious';
-  const linter = new A11yLinter({ config, failOn });
-  const result = await linter.lintFiles(workspace, files);
-  const aliasNames = Object.keys(config.aliases);
-  if (aliasNames.length) core.info(`Checking ${aliasNames.length} wrapper ${aliasNames.length === 1 ? 'alias' : 'aliases'}: ${aliasNames.join(', ')}.`);
-  // Only a full scan can tell that an alias is never used; a PR's changed files may simply not include it.
-  if (scope === 'full scan') {
-    for (const name of aliasNames.filter((n) => !linter.usedAliases.has(n))) {
-      core.warning(`Alias "${name}" matched no JSX tag in the scanned files. Check the spelling, and that it is imported where it is used.`);
+  let result: ScanResult = { findings: [], filesScanned: 0, parseErrors: [], suppressed: 0, rules: new Map() };
+  if (runStatic) {
+    const linter = new A11yLinter({ config, failOn });
+    result = await linter.lintFiles(workspace, files);
+    const aliasNames = Object.keys(config.aliases);
+    if (aliasNames.length) core.info(`Checking ${aliasNames.length} wrapper ${aliasNames.length === 1 ? 'alias' : 'aliases'}: ${aliasNames.join(', ')}.`);
+    // Only a full scan can tell that an alias is never used; a PR's changed files may simply not include it.
+    if (scope === 'full scan') {
+      for (const name of aliasNames.filter((n) => !linter.usedAliases.has(n))) {
+        core.warning(`Alias "${name}" matched no JSX tag in the scanned files. Check the spelling, and that it is imported where it is used.`);
+      }
     }
+  }
+
+  let theme: ThemeAuditResult | undefined;
+  if (runTheme) {
+    // Themes are found in the whole tree: a PR that doesn't touch the theme still renders with it.
+    const themeFiles = scope === 'full scan' ? files : filterFiles(await walk(workspace, dir), dir, inputs.include, inputs.exclude);
+    theme = await runThemeAudit({
+      workspace,
+      dir,
+      files: themeFiles,
+      config,
+      failOn,
+      changed: scope === 'changed files' ? new Set(candidates) : undefined,
+    });
+    for (const note of theme.notes) core.info(note);
+    for (const s of theme.skipped) core.warning(`Theme not audited: ${s.reason}.`, { file: s.file, startLine: s.line, title: 'antd-a11y: theme' });
+    if (!theme.unchanged) core.info(`Theme audit: ${theme.configurations.map((c) => `${c.name} (${c.findings})`).join(', ')} with ${theme.antd}.`);
+    result.findings.push(...theme.findings);
+    for (const [id, info] of theme.rules) result.rules.set(id, info);
+    result.findings.sort((a, b) => Number(b.blocking) - Number(a.blocking));
   }
   const blocking = result.findings.filter((f) => f.blocking).length;
 
@@ -80,7 +109,9 @@ export async function run(): Promise<void> {
     failOn,
     blobBase,
     scope,
-    overrides: overridesNote(config, ['antd-a11y/', 'jsx-a11y/']),
+    scanned: runStatic ? undefined : 'the theme',
+    overrides: overridesNote(config, ['antd-a11y/', 'jsx-a11y/', 'theme/']),
+    sections: theme ? [renderThemeSection(theme, blobBase)] : [],
   });
 
   if (process.env.GITHUB_STEP_SUMMARY) {

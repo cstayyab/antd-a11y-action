@@ -18,6 +18,8 @@ export interface MarkdownContext {
   banner?: string;
   /** Footer note when configuration changed rule severities, so reviewers see a loosened gate. */
   overrides?: string;
+  /** Sections rendered after the findings, e.g. the theme audit's; their findings stay out of the per-file table. */
+  sections?: string[];
 }
 
 /** "[4.1.2](understanding link) [2.4.4](…)", hovering shows the criterion's name and level. */
@@ -67,10 +69,11 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
     }
     lines.push('');
 
-    const shown = result.findings.slice(0, MAX_ROWS);
-    lines.push(
-      `<details${blocking > 0 ? ' open' : ''}><summary>Findings${
-        result.findings.length > MAX_ROWS ? ` (first ${MAX_ROWS} of ${result.findings.length})` : ''
+    const listed = result.findings.filter((f) => !f.theme);
+    const shown = listed.slice(0, MAX_ROWS);
+    if (shown.length) lines.push(
+      `<details${listed.some((f) => f.blocking) ? ' open' : ''}><summary>Findings${
+        listed.length > MAX_ROWS ? ` (first ${MAX_ROWS} of ${listed.length})` : ''
       }</summary>`,
       '',
       '| | Location | Rule | WCAG | Message |',
@@ -90,8 +93,9 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
         `| ${f.blocking ? 'Blocking' : f.impact} | ${where} | \`${f.ruleId}\` | ${wcagCell(f.wcag)} | ${escapeCell(f.message)} |`,
       );
     }
-    lines.push('', '</details>');
+    if (shown.length) lines.push('', '</details>');
   }
+  for (const section of ctx.sections ?? []) lines.push('', section.trimEnd());
 
   const notes: string[] = [];
   if (result.suppressed > 0) notes.push(`${result.suppressed} suppressed with \`a11y-ignore\` or \`eslint-disable\``);

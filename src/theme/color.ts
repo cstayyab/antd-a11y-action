@@ -156,39 +156,46 @@ function rgbToHsl({ r, g, b }: Rgba): [number, number, number] {
 }
 
 /**
- * The nearest colour to `fg` with the same hue and saturation that reaches `target` over `bg`: its
- * lightness moves towards black or white, whichever direction can pass, by the smallest step. A
- * translucent colour keeps its alpha when that can still pass, else it becomes opaque.
+ * The nearest colour to `fg` that reaches `target` over `bg`. A translucent colour (antd's text and
+ * fill shades are black or white at an alpha) becomes more opaque; an opaque one keeps its hue and
+ * saturation and moves its lightness towards black or white, whichever can pass, by the smallest step.
  */
 export function suggestColor(fg: Rgba, bg: Rgba, target: number): Rgba | undefined {
+  const passes = (c: Rgba) => contrast(c, bg) >= target;
+  if (fg.a < 1 && passes({ ...fg, a: 1 })) {
+    let [fail, pass] = [fg.a, 1];
+    for (let i = 0; i < 20; i += 1) {
+      const mid = (fail + pass) / 2;
+      if (passes({ ...fg, a: mid })) pass = mid;
+      else fail = mid;
+    }
+    // Round up to the 8-bit alpha a hex colour can carry.
+    const a = Math.min(1, Math.ceil(pass * 255) / 255);
+    return { ...fg, a };
+  }
   const [h, s, l0] = rgbToHsl(fg);
   const make = (l: number, a: number): Rgba => {
     const [r, g, b] = hslToRgb(h, s, l);
     return { r: Math.round(r), g: Math.round(g), b: Math.round(b), a };
   };
-  const passes = (c: Rgba) => contrast(c, bg) >= target;
-  for (const a of fg.a < 1 ? [fg.a, 1] : [1]) {
-    let best: Rgba | undefined;
-    for (const end of [0, 1]) {
-      if (!passes(make(end, a))) continue;
-      // Binary search for the lightness closest to the original that still passes.
-      let [pass, fail] = [end, l0];
-      for (let i = 0; i < 24; i += 1) {
-        const mid = (pass + fail) / 2;
-        if (passes(make(mid, a))) pass = mid;
-        else fail = mid;
-      }
-      const candidate = make(pass, a);
-      // Rounding to 8-bit channels can land just under the threshold; step on until it passes.
-      let l = pass;
-      let c = candidate;
-      while (!passes(c) && l !== end) {
-        l = end === 0 ? Math.max(0, l - 0.002) : Math.min(1, l + 0.002);
-        c = make(l, a);
-      }
-      if (!best || Math.abs(l - l0) < Math.abs(rgbToHsl(best)[2] - l0)) best = c;
+  let best: Rgba | undefined;
+  for (const end of [0, 1]) {
+    if (!passes(make(end, 1))) continue;
+    // Binary search for the lightness closest to the original that still passes.
+    let [pass, fail] = [end, l0];
+    for (let i = 0; i < 24; i += 1) {
+      const mid = (pass + fail) / 2;
+      if (passes(make(mid, 1))) pass = mid;
+      else fail = mid;
     }
-    if (best) return best;
+    // Rounding to 8-bit channels can land just under the threshold; step on until it passes.
+    let l = pass;
+    let c = make(l, 1);
+    while (!passes(c) && l !== end) {
+      l = end === 0 ? Math.max(0, l - 0.002) : Math.min(1, l + 0.002);
+      c = make(l, 1);
+    }
+    if (!best || Math.abs(l - l0) < Math.abs(rgbToHsl(best)[2] - l0)) best = c;
   }
-  return undefined;
+  return best;
 }

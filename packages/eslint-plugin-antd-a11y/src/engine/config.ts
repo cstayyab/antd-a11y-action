@@ -40,9 +40,24 @@ export interface A11yConfig {
   aliases: AliasMap;
   /** Lowest impact that blocks, from the config file or options; the action's fail-on input overrides it. */
   failOn?: Impact | 'none';
+  /** The theme audit (mode: theme). */
+  theme: ThemeSettings;
   /** Repo-relative path of the config file that was applied, if any. */
   file?: string;
 }
+
+export interface ThemeSettings {
+  /**
+   * Severity of findings antd's default theme already has (the team's theme didn't cause them):
+   * warn by default, so adopting the audit doesn't fail on antd's own colours.
+   */
+  inherited: Severity;
+  /** Module that exports the theme config, evaluated in a separate process (opt-in). */
+  config?: string;
+}
+
+/** Rules of the theme audit. text-contrast-enhanced (AAA) is off unless a rules entry turns it on. */
+export const THEME_RULES = ['text-contrast', 'non-text-contrast', 'placeholder-contrast', 'text-contrast-enhanced'] as const;
 
 /** The action's name for it. */
 export type ActionConfig = A11yConfig;
@@ -85,13 +100,14 @@ export function isKnownRule(id: string): boolean {
   if (id.startsWith(ANTD_PREFIX)) return id.slice(ANTD_PREFIX.length) in antdRules;
   if (id.startsWith(JSX_PREFIX)) return id.slice(JSX_PREFIX.length) in (jsxA11y.rules ?? {});
   if (id.startsWith('runtime/')) return runtimeRuleCheck(id.slice('runtime/'.length));
+  if (id.startsWith('theme/')) return (THEME_RULES as readonly string[]).includes(id.slice('theme/'.length));
   return id.startsWith('axe/') && id.length > 'axe/'.length; // axe has too many rules to list; any id is accepted
 }
 
 function checkKnown(id: string, where: string): void {
   if (!isKnownRule(id)) {
     throw new ConfigError(
-      `${where}: unknown rule "${id}". Use antd-a11y/<rule>, jsx-a11y/<rule>, runtime/<rule> or axe/<rule-id>.`,
+      `${where}: unknown rule "${id}". Use antd-a11y/<rule>, jsx-a11y/<rule>, runtime/<rule>, theme/<rule> or axe/<rule-id>.`,
     );
   }
 }
@@ -176,6 +192,7 @@ export interface FileShape {
   aliases?: unknown;
   rules?: Record<string, unknown>;
   settings?: { components?: unknown; polymorphicPropName?: unknown; attributes?: unknown };
+  theme?: { inherited?: unknown; config?: unknown };
 }
 
 /** Reads the JSON config file. Returns null when the file doesn't exist. */
@@ -192,7 +209,7 @@ export function readConfigFile(file: string, label = file): FileShape | null {
   return data as FileShape;
 }
 
-const FILE_KEYS = ['jsxA11y', 'failOn', 'rules', 'settings', 'aliases'];
+const FILE_KEYS = ['jsxA11y', 'failOn', 'rules', 'settings', 'aliases', 'theme'];
 
 function checkShape(data: object, label: string): void {
   for (const key of Object.keys(data)) {
@@ -235,6 +252,22 @@ function fileSettings(shape: FileShape, file: string): Partial<JsxA11ySettings> 
   return out;
 }
 
+function fileTheme(shape: FileShape, file: string): Partial<ThemeSettings> {
+  const t = shape.theme;
+  if (t === undefined) return {};
+  if (!t || typeof t !== 'object' || Array.isArray(t)) throw new ConfigError(`${file}: theme must be an object.`);
+  for (const key of Object.keys(t)) {
+    if (!['inherited', 'config'].includes(key)) throw new ConfigError(`${file}: unknown key "theme.${key}" (allowed: inherited, config).`);
+  }
+  const out: Partial<ThemeSettings> = {};
+  if (t.inherited !== undefined) out.inherited = severityOf(t.inherited, `${file}: theme.inherited`);
+  if (t.config !== undefined) {
+    if (typeof t.config !== 'string' || !t.config.trim()) throw new ConfigError(`${file}: theme.config must be a path.`);
+    out.config = t.config;
+  }
+  return out;
+}
+
 export interface ConfigInputs {
   /** Raw `jsx-a11y` input; empty means "not set", so the file (or the default) decides. */
   jsxA11y?: string;
@@ -243,6 +276,8 @@ export interface ConfigInputs {
   rules?: string;
   components?: string;
   aliases?: string;
+  /** Raw `theme-config` input: a module exporting the theme, evaluated only when set. */
+  themeConfig?: string;
   /** Path of the config file relative to the workspace; missing files are fine. */
   configFile?: string;
   workspace: string;
@@ -293,7 +328,13 @@ export function resolveConfig(inputs: ConfigInputs): A11yConfig {
     ...(options ? fileAliases(options, 'antd-a11y options') : {}),
     ...parseAliasesInput(inputs.aliases),
   };
-  return { jsxA11y: jsx, rules, settings, aliases, failOn, file: fileLabel };
+  const theme: ThemeSettings = {
+    inherited: 'warn',
+    ...(shape ? fileTheme(shape, fileLabel!) : {}),
+    ...(options ? fileTheme(options, 'antd-a11y options') : {}),
+  };
+  if (inputs.themeConfig && inputs.themeConfig.trim() !== '') theme.config = inputs.themeConfig.trim();
+  return { jsxA11y: jsx, rules, settings, aliases, failOn, theme, file: fileLabel };
 }
 
 /** Our tuning of jsx-a11y's presets, from beta feedback (see README "Precision"). */

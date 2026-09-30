@@ -8,8 +8,8 @@ branding:
 inputs:
   mode:
     description: >-
-      Comma-separated layers to run: static, theme, runtime. This action runs "static";
-      the runtime check is the separate cstayyab/antd-a11y-action/runtime sub-action.
+      Comma-separated layers to run: static (lint the JSX), theme (audit the antd theme's colour
+      contrast). The runtime check is the separate cstayyab/antd-a11y-action/runtime sub-action.
     default: static
   fail-on:
     description: >-
@@ -48,6 +48,12 @@ inputs:
       In-house wrappers around antd components, one "WrapperName: AntdComponent" per line (e.g.
       "HintTooltip: Tooltip"), so the antd rules check them. Only imported components match. For per-rule
       aliases (a wrapper that meets a rule when it gets a prop), use the config file.
+    default: ''
+  theme-config:
+    description: >-
+      mode: theme. A module that exports the theme ("src/theme.ts", or "src/theme.ts#darkTheme" for a
+      named export), for themes built with functions or imports. This runs repository code: use it on
+      pull_request, never pull_request_target. Empty finds ConfigProvider themes without running code.
     default: ''
   config:
     description: JSON config file (rules with options, jsx-a11y settings, aliases), relative to the repository root. Used only if it exists.
