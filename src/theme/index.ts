@@ -1,5 +1,6 @@
 // mode: theme. Finds the app's themes, audits each configuration and returns findings in the same
 // shape as the static check's, plus a summary for the report.
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { engine } from 'eslint-plugin-antd-a11y';
@@ -59,6 +60,16 @@ export interface ThemeAuditOptions {
 }
 
 const PACKAGE_FILES = ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lock', 'bun.lockb'];
+
+/**
+ * For a baseline: the configuration's variant (not its line, which moves), the rule and the tokens,
+ * so the entry survives edits elsewhere in the file and a colour change in the same pair.
+ */
+function themeFingerprint(configuration: ThemeConfiguration, f: ThemeFinding): string {
+  const variant = configuration.name.replace(/^.*?:\d+(?= |$)/, '').trim();
+  const key = ['theme', variant, f.rule, f.fg.token, ...f.bg.tokens].join('|');
+  return createHash('sha256').update(key).digest('hex').slice(0, 10);
+}
 
 export async function runThemeAudit(options: ThemeAuditOptions): Promise<ThemeAuditResult> {
   const { workspace, config, failOn } = options;
@@ -151,6 +162,7 @@ export async function runThemeAudit(options: ThemeAuditOptions): Promise<ThemeAu
         wcag: info.wcag,
         target: f.location ? undefined : configuration.name,
         theme: { configuration: configuration.name, inherited: f.inherited, pairIds: f.pairIds },
+        fingerprint: themeFingerprint(configuration, f),
       });
       summary.findings += 1;
       if (blocking) summary.blocking += 1;

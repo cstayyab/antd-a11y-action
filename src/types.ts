@@ -22,6 +22,10 @@ export interface Finding {
   impact: Impact;
   /** At or above the `fail-on` threshold. */
   blocking: boolean;
+  /** Identifies the finding in a baseline file: its element's tag and accessibility-relevant attributes. */
+  fingerprint?: string;
+  /** Set when a baseline is in use: baselined findings are reported but never block. */
+  baseline?: 'new' | 'baselined';
   /** Theme audit findings: the configuration, and whether antd's default theme has the same problem. */
   theme?: { configuration: string; inherited: boolean; pairIds: string[] };
 }

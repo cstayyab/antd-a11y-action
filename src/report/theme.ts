@@ -43,7 +43,7 @@ export function renderThemeSection(theme: ThemeAuditResult, blobBase?: string): 
       '| --- | --- | --- | ---: | --- | --- |',
     );
     for (const { d, f } of rows.slice(0, MAX_ROWS)) {
-      const status = f.blocking ? 'Blocking' : d.inherited ? 'antd default' : f.impact;
+      const status = f.blocking ? 'Blocking' : f.baseline === 'baselined' ? 'Baselined' : d.inherited ? 'antd default' : f.impact;
       const elements = `${cell(d.elements[0])}${d.elements.length > 1 ? ` <sub>+${d.elements.length - 1} more</sub>` : ''}`;
       const colours = `\`${d.fg.token}\` ${d.fg.color} on \`${d.bg.tokens.at(-1)}\` ${d.bg.color}`;
       const source = `${cell(d.origin)}${d.location ? `<br>${where(d.location.file, d.location.line, blobBase)}` : ''}`;

@@ -70,18 +70,41 @@ inputs:
   github-token:
     description: Token used to list PR files and write the PR comment.
     default: ${{ github.token }}
-  # Reserved for the baseline layer; ignored in this release.
   baseline:
-    description: Reserved. Path to a baseline file of known violations.
-    required: false
+    description: >-
+      Baseline file of known findings, relative to the repository root (e.g. .github/antd-a11y-baseline.json).
+      Its findings are reported but never block; only new ones do. Empty uses the config file's "baseline".
+    default: ''
+  baseline-update:
+    description: >-
+      false, shrink or full. shrink removes fixed entries and never adds any (run it on pushes to the default
+      branch); full rewrites this working directory's entries from the scan (needs changed-only: false). Either
+      writes the file, uploads it as an artifact and blocks nothing; commit it in a later step.
+    default: 'false'
+  baseline-strict:
+    description: Fail when the baseline has entries that are already fixed, including entries for deleted files.
+    default: 'false'
+  baseline-age-warning:
+    description: Days. Warn about baselined entries older than this. Never fails the check.
+    default: ''
 
 outputs:
   violations:
     description: Total number of findings.
   blocking-violations:
-    description: Findings at or above fail-on.
+    description: Findings that block (at or above fail-on, not in the baseline).
   sarif-file:
     description: Absolute path of the SARIF report.
+  baselined:
+    description: Findings that are in the baseline (reported, never blocking).
+  fixed:
+    description: Baseline entries with no matching finding any more (ready to remove).
+  baseline-oldest:
+    description: The oldest "added" date among baselined entries, YYYY-MM-DD.
+  baseline-aged:
+    description: Baselined entries older than baseline-age-warning days.
+  baseline-file:
+    description: Absolute path of the updated baseline file (baseline-update only).
 
 runs:
   using: node24

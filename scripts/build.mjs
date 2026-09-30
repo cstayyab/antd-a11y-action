@@ -22,9 +22,7 @@ const banner = {
   ].join(' '),
 };
 
-const result = await build({
-  // index.mjs: the static action. runtime-report.mjs: the runtime sub-action's reporter.
-  entryPoints: { index: `${root}/src/index.ts`, 'runtime-report': `${root}/src/runtime/index.ts` },
+const common = {
   outdir: `${root}/dist`,
   outExtension: { '.js': '.mjs' },
   bundle: true,
@@ -34,7 +32,6 @@ const result = await build({
   minify: true,
   keepNames: true,
   sourcemap: false,
-  alias: { 'eslint-plugin-antd-a11y': `${root}/packages/eslint-plugin-antd-a11y/src/index.ts` },
   // The theme audit loads the bundled antd copies below (dist/antd<major>.mjs) when the repository has none.
   define: { __ANTD_BUNDLED__: 'true' },
   banner,
@@ -43,10 +40,24 @@ const result = await build({
   legalComments: 'linked',
   metafile: true,
   logLevel: 'warning',
-});
+};
+const plugin = `${root}/packages/eslint-plugin-antd-a11y/src/index.ts`;
 
-for (const [file, output] of Object.entries(result.metafile.outputs)) {
-  if (file.endsWith('.mjs')) console.log(`${file.replace(`${root}/`, '')} built (${(output.bytes / 1024 / 1024).toFixed(2)} MB)`);
+// index.mjs: the static action. runtime-report.mjs: the runtime sub-action's reporter, which never
+// parses source (baseline fingerprints are for static findings), so it gets a stub parser.
+const builds = await Promise.all([
+  build({ ...common, entryPoints: { index: `${root}/src/index.ts` }, alias: { 'eslint-plugin-antd-a11y': plugin } }),
+  build({
+    ...common,
+    entryPoints: { 'runtime-report': `${root}/src/runtime/index.ts` },
+    alias: { 'eslint-plugin-antd-a11y': plugin, '@typescript-eslint/typescript-estree': `${root}/scripts/stubs/typescript-estree.mjs` },
+  }),
+]);
+
+for (const result of builds) {
+  for (const [file, output] of Object.entries(result.metafile.outputs)) {
+    if (file.endsWith('.mjs')) console.log(`${file.replace(`${root}/`, '')} built (${(output.bytes / 1024 / 1024).toFixed(2)} MB)`);
+  }
 }
 
 // antd copies for the theme audit, one per supported major: the theme API and every style module,

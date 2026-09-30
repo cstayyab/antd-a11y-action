@@ -1,10 +1,12 @@
 // The ESLint config the action lints with, and the one `antdA11y.config()` gives an app, built by the
 // same function so a local ESLint run and the PR check see the same rules, settings and filters.
+import path from 'node:path';
 import type { Linter } from 'eslint';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import { plugin, VERSION } from '../plugin.js';
 import type { Impact } from '../utils/create-rule.js';
 import { eslintRules, resolveConfig, type A11yConfig, type FileShape } from './config.js';
+import { aliasProps, fingerprintAt, matchBaseline, readBaseline, type BaselineEntry } from './baseline.js';
 import { evaluateMessages } from './findings.js';
 import { wrapPlugin } from './jsx-a11y-filters.js';
 
@@ -55,10 +57,14 @@ export function buildFlatConfig(config: A11yConfig, options: BuildOptions = {}):
 /**
  * Applies what ESLint's rule model can't express, after linting: drops the jsx-a11y duplicate of an
  * antd finding, applies a11y-ignore comments, and sets each finding's severity from whether it would
- * block the PR check (error) or not (warning). Other plugins' messages pass through untouched.
+ * block the PR check (error) or not (warning). A finding in the baseline is a warning, as it never
+ * blocks the PR check. Other plugins' messages pass through untouched.
  */
-export function createProcessor(config: A11yConfig, failOn: Impact | 'none'): Linter.Processor {
+export function createProcessor(config: A11yConfig, failOn: Impact | 'none', cwd = process.cwd()): Linter.Processor {
   const sources = new Map<string, string>();
+  // Paths in the baseline are relative to the repository root, which `cwd` is (like the config file's).
+  const baseline: BaselineEntry[] = config.baseline ? (readBaseline(path.resolve(cwd, config.baseline), config.baseline)?.entries ?? []) : [];
+  const extraProps = aliasProps(config.aliases);
   return {
     meta: { name: 'antd-a11y/findings', version: VERSION },
     supportsAutofix: true,
@@ -70,9 +76,19 @@ export function createProcessor(config: A11yConfig, failOn: Impact | 'none'): Li
       const code = sources.get(filename) ?? '';
       sources.delete(filename);
       const evaluation = evaluateMessages(messageLists.flat(), code, { config, failOn });
-      const findings = evaluation.findings.map(({ message, blocking }) => ({
+      const file = path.relative(cwd, filename).split(path.sep).join('/');
+      const source = { code };
+      const identified = evaluation.findings.map((f) => ({
+        ...f,
+        file,
+        rule: f.message.ruleId,
+        fingerprint: baseline.length ? fingerprintAt(source, f.message.line, f.message.column, extraProps) : '',
+      }));
+      const match = matchBaseline(identified, baseline, { scanned: new Set([file]), dir: '', exists: () => true });
+      const findings = match.findings.map(({ finding: { message, blocking }, state }) => ({
         ...message,
-        severity: blocking ? (2 as const) : (1 as const),
+        ...(state === 'baselined' ? { message: `${message.message} (in the baseline)` } : {}),
+        severity: blocking && state === 'new' ? (2 as const) : (1 as const),
       }));
       return [...evaluation.other, ...findings].sort((a, b) => a.line - b.line || a.column - b.column);
     },
@@ -103,6 +119,6 @@ export function config(options: PluginConfigOptions = {}): Linter.Config[] {
   return buildFlatConfig(resolved, {
     files,
     parser,
-    processor: processor ? createProcessor(resolved, failOn) : undefined,
+    processor: processor ? createProcessor(resolved, failOn, cwd) : undefined,
   });
 }

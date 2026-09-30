@@ -42,6 +42,8 @@ export interface A11yConfig {
   failOn?: Impact | 'none';
   /** The theme audit (mode: theme). */
   theme: ThemeSettings;
+  /** Baseline file of known findings, repo-relative; its findings never block. */
+  baseline?: string;
   /** Repo-relative path of the config file that was applied, if any. */
   file?: string;
 }
@@ -193,6 +195,7 @@ export interface FileShape {
   rules?: Record<string, unknown>;
   settings?: { components?: unknown; polymorphicPropName?: unknown; attributes?: unknown };
   theme?: { inherited?: unknown; config?: unknown };
+  baseline?: unknown;
 }
 
 /** Reads the JSON config file. Returns null when the file doesn't exist. */
@@ -209,7 +212,7 @@ export function readConfigFile(file: string, label = file): FileShape | null {
   return data as FileShape;
 }
 
-const FILE_KEYS = ['jsxA11y', 'failOn', 'rules', 'settings', 'aliases', 'theme'];
+const FILE_KEYS = ['jsxA11y', 'failOn', 'rules', 'settings', 'aliases', 'theme', 'baseline'];
 
 function checkShape(data: object, label: string): void {
   for (const key of Object.keys(data)) {
@@ -278,6 +281,8 @@ export interface ConfigInputs {
   aliases?: string;
   /** Raw `theme-config` input: a module exporting the theme, evaluated only when set. */
   themeConfig?: string;
+  /** Raw `baseline` input; empty lets the config file decide. */
+  baseline?: string;
   /** Path of the config file relative to the workspace; missing files are fine. */
   configFile?: string;
   workspace: string;
@@ -334,7 +339,15 @@ export function resolveConfig(inputs: ConfigInputs): A11yConfig {
     ...(options ? fileTheme(options, 'antd-a11y options') : {}),
   };
   if (inputs.themeConfig && inputs.themeConfig.trim() !== '') theme.config = inputs.themeConfig.trim();
-  return { jsxA11y: jsx, rules, settings, aliases, failOn, theme, file: fileLabel };
+
+  let baseline: string | undefined;
+  for (const [source, label] of [[shape, fileLabel], [options, 'antd-a11y options']] as const) {
+    if (source?.baseline === undefined) continue;
+    if (typeof source.baseline !== 'string' || !source.baseline.trim()) throw new ConfigError(`${label}: baseline must be a path.`);
+    baseline = source.baseline.trim();
+  }
+  if (inputs.baseline && inputs.baseline.trim() !== '') baseline = inputs.baseline.trim();
+  return { jsxA11y: jsx, rules, settings, aliases, failOn, theme, baseline, file: fileLabel };
 }
 
 /** Our tuning of jsx-a11y's presets, from beta feedback (see README "Precision"). */

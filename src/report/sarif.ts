@@ -75,6 +75,9 @@ function resultFor(finding: Finding & { file: string; line: number }, ruleIndex:
         },
       },
     ],
+    ...(finding.fingerprint ? { partialFingerprints: { 'antdA11y/v1': finding.fingerprint } } : {}),
+    // Code Scanning tells known findings from new ones by this.
+    ...(finding.baseline ? { baselineState: finding.baseline === 'baselined' ? 'unchanged' : 'new' } : {}),
     properties: { impact: finding.impact, ...(finding.wcag?.length ? { wcag: finding.wcag } : {}) },
   };
 }

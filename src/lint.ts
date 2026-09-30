@@ -12,6 +12,8 @@ export const { SOURCE_EXTENSIONS, parseIgnoreDirectives } = engine;
 export interface LintOptions {
   config: ActionConfig;
   failOn: Impact | 'none';
+  /** Compute each finding's fingerprint, for a baseline. */
+  fingerprints?: boolean;
 }
 
 /** The ESLint config the action lints with: the plugin's own, plus the TypeScript parser. */
@@ -25,11 +27,13 @@ export function buildConfig(config: ActionConfig): Linter.Config[] {
 export class A11yLinter {
   private readonly linter = new Linter({ configType: 'flat' });
   private readonly config: Linter.Config[];
+  private readonly aliasProps: Set<string>;
   /** Alias names that appear as a JSX tag in at least one scanned file. */
   readonly usedAliases = new Set<string>();
 
   constructor(private readonly options: LintOptions) {
     this.config = buildConfig(options.config);
+    this.aliasProps = engine.aliasProps(options.config.aliases);
     // Invalid rule options throw here with ESLint's own message, instead of failing on every file.
     try {
       this.linter.verify('', this.config, { filename: 'config-check.tsx' });
@@ -57,6 +61,7 @@ export class A11yLinter {
     for (const message of evaluation.other) {
       if (message.fatal) result.parseErrors.push({ file, line: message.line, message: message.message });
     }
+    const source = { code };
     for (const { message, impact, blocking } of evaluation.findings) {
       if (!result.rules.has(message.ruleId)) result.rules.set(message.ruleId, ruleInfo(message.ruleId));
       const finding: Finding = {
@@ -70,6 +75,7 @@ export class A11yLinter {
         impact,
         blocking,
         wcag: result.rules.get(message.ruleId)!.wcag,
+        ...(this.options.fingerprints ? { fingerprint: engine.fingerprintAt(source, message.line, message.column, this.aliasProps) } : {}),
       };
       result.findings.push(finding);
     }

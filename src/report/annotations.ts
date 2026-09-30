@@ -8,6 +8,7 @@ export function annotate(result: ScanResult, max: number): number {
   for (const finding of result.findings) {
     if (emitted >= max) break;
     if (!finding.file) continue; // nothing in the diff to attach it to
+    if (finding.baseline === 'baselined') continue; // known findings stay in the comment, not on the diff
     const wcag = finding.wcag ?? [];
     const props: core.AnnotationProperties = {
       title: `${finding.ruleId} (${finding.impact})${wcag.length ? ` · WCAG ${wcag.join(', ')}` : ''}`,
@@ -24,7 +25,7 @@ export function annotate(result: ScanResult, max: number): number {
     else core.warning(message, props);
     emitted += 1;
   }
-  const annotatable = result.findings.filter((f) => f.file).length;
+  const annotatable = result.findings.filter((f) => f.file && f.baseline !== 'baselined').length;
   if (annotatable > emitted) {
     core.warning(
       `Showing ${emitted} of ${annotatable} findings as annotations. See the SARIF file or PR comment for the rest.`,

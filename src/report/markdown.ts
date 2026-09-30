@@ -1,4 +1,4 @@
-import { IMPACTS, type Impact, type ScanResult } from '../types.js';
+import { IMPACTS, type Finding, type Impact, type ScanResult } from '../types.js';
 import { criterion } from '../wcag.js';
 
 export const COMMENT_MARKER = '<!-- antd-a11y-guard -->';
@@ -20,6 +20,8 @@ export interface MarkdownContext {
   overrides?: string;
   /** Sections rendered after the findings, e.g. the theme audit's; their findings stay out of the per-file table. */
   sections?: string[];
+  /** With a baseline: "3 new · 41 baselined (oldest 8 months) · 2 fixed", and the fixed entries. */
+  baseline?: { file: string; line: string; fixed: { file: string; rule: string; fixed: number }[] };
 }
 
 /** "[4.1.2](understanding link) [2.4.4](…)", hovering shows the criterion's name and level. */
@@ -36,9 +38,20 @@ function escapeCell(text: string): string {
   return text.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').replace(/</g, '&lt;');
 }
 
+/** A finding's file and line, linked when the blob URL is known; its DOM target when it has no file. */
+function where(f: Finding, ctx: MarkdownContext): string {
+  if (!f.file) return f.target ? `\`${escapeCell(f.target)}\`` : 'unknown';
+  const loc = f.line ? `${f.file}:${f.line}` : f.file;
+  const anchor = f.line ? `#L${f.line}` : '';
+  return ctx.blobBase ? `[${escapeCell(loc)}](${ctx.blobBase}/${encodeURI(f.file)}${anchor})` : `\`${loc}\``;
+}
+
 export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string {
   const blocking = result.findings.filter((f) => f.blocking).length;
-  const other = result.findings.length - blocking;
+  // Baselined findings are listed on their own, below; everything above is about new ones.
+  const fresh = result.findings.filter((f) => f.baseline !== 'baselined');
+  const baselined = result.findings.filter((f) => f.baseline === 'baselined');
+  const other = fresh.length - blocking;
   const lines: string[] = [ctx.marker ?? COMMENT_MARKER, `## ${ctx.title ?? 'antd A11y Guard'}`, ''];
   if (ctx.banner) lines.push(`> ${ctx.banner}`, '');
 
@@ -50,9 +63,10 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
     const below = ctx.failOn === 'none' ? `${other} reported (fail-on: none)` : `${other} below the \`${ctx.failOn}\` threshold`;
     lines.push(`${verdict} · ${below} · ${files} scanned (${ctx.scope})`);
     lines.push('');
+    if (ctx.baseline) lines.push(`Baseline \`${ctx.baseline.file}\`: ${ctx.baseline.line}`, '');
 
     const byRule = new Map<string, Record<Impact, number>>();
-    for (const f of result.findings) {
+    for (const f of fresh) {
       const counts = byRule.get(f.ruleId) ?? { minor: 0, moderate: 0, serious: 0, critical: 0 };
       counts[f.impact] += 1;
       byRule.set(f.ruleId, counts);
@@ -69,7 +83,7 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
     }
     lines.push('');
 
-    const listed = result.findings.filter((f) => !f.theme);
+    const listed = fresh.filter((f) => !f.theme);
     const shown = listed.slice(0, MAX_ROWS);
     if (shown.length) lines.push(
       `<details${listed.some((f) => f.blocking) ? ' open' : ''}><summary>Findings${
@@ -80,20 +94,30 @@ export function renderMarkdown(result: ScanResult, ctx: MarkdownContext): string
       '| --- | --- | --- | --- | --- |',
     );
     for (const f of shown) {
-      let where: string;
-      if (f.file) {
-        const loc = f.line ? `${f.file}:${f.line}` : f.file;
-        const anchor = f.line ? `#L${f.line}` : '';
-        where = ctx.blobBase ? `[${escapeCell(loc)}](${ctx.blobBase}/${encodeURI(f.file)}${anchor})` : `\`${loc}\``;
-      } else {
-        where = f.target ? `\`${escapeCell(f.target)}\`` : 'unknown';
-      }
-      if (f.routes?.length) where += `<br><sub>${escapeCell(f.routes.join(', '))}</sub>`;
+      const routes = f.routes?.length ? `<br><sub>${escapeCell(f.routes.join(', '))}</sub>` : '';
       lines.push(
-        `| ${f.blocking ? 'Blocking' : f.impact} | ${where} | \`${f.ruleId}\` | ${wcagCell(f.wcag)} | ${escapeCell(f.message)} |`,
+        `| ${f.blocking ? 'Blocking' : f.impact} | ${where(f, ctx)}${routes} | \`${f.ruleId}\` | ${wcagCell(f.wcag)} | ${escapeCell(f.message)} |`,
       );
     }
     if (shown.length) lines.push('', '</details>');
+  }
+  if (baselined.length) {
+    const perRule = new Map<string, number>();
+    for (const f of baselined) perRule.set(f.ruleId, (perRule.get(f.ruleId) ?? 0) + 1);
+    lines.push('', `<details><summary>Baselined: ${baselined.length} known ${baselined.length === 1 ? 'finding' : 'findings'} (reported, not blocking)</summary>`, '');
+    lines.push('| Rule | Baselined |', '| --- | ---: |');
+    for (const [rule, n] of [...perRule].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) lines.push(`| \`${rule}\` | ${n} |`);
+    lines.push('');
+    for (const f of baselined.filter((b) => !b.theme).slice(0, MAX_ROWS)) {
+      lines.push(`- ${where(f, ctx)} \`${f.ruleId}\`: ${escapeCell(f.message)}`);
+    }
+    lines.push('', '</details>');
+  }
+  if (ctx.baseline?.fixed.length) {
+    const total = ctx.baseline.fixed.reduce((n, e) => n + e.fixed, 0);
+    lines.push('', `<details><summary>Fixed: ${total} baseline ${total === 1 ? 'entry' : 'entries'} to remove</summary>`, '');
+    for (const e of ctx.baseline.fixed.slice(0, MAX_ROWS)) lines.push(`- \`${e.file}\` \`${e.rule}\`${e.fixed > 1 ? ` ×${e.fixed}` : ''}`);
+    lines.push('', 'Run the action with `baseline-update: shrink` to drop them from the baseline.', '', '</details>');
   }
   for (const section of ctx.sections ?? []) lines.push('', section.trimEnd());
 

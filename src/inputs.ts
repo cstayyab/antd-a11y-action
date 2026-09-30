@@ -3,9 +3,6 @@ import * as core from '@actions/core';
 export type Mode = 'static' | 'theme' | 'runtime';
 const MODES: readonly Mode[] = ['static', 'theme', 'runtime'];
 
-// Declared in action.yml for the baseline layer; accepted but not used yet.
-const RESERVED_INPUTS = ['baseline'];
-
 export interface Inputs {
   modes: Mode[];
   /** Raw fail-on input; validated with the config, which may also set it. */
@@ -26,6 +23,12 @@ export interface Inputs {
   aliases: string;
   /** Module exporting the theme ("path" or "path#export"); empty means discover themes statically. */
   themeConfig: string;
+  /** Baseline file, repo-relative; empty lets the config file decide. */
+  baseline: string;
+  baselineUpdate: 'false' | 'full' | 'shrink';
+  baselineStrict: boolean;
+  /** Days; warn about baselined entries older than this. */
+  baselineAgeWarning?: number;
   /** JSON config file, relative to the repository root; used only if it exists. */
   configFile: string;
   maxAnnotations: number;
@@ -70,11 +73,6 @@ export function readInputs(): Inputs {
       core.warning('mode "runtime" runs as its own step: add `uses: cstayyab/antd-a11y-action/runtime@v0`. This step runs "static" and "theme" only.');
     }
   }
-  for (const name of RESERVED_INPUTS) {
-    if (core.getInput(name)) {
-      core.warning(`Input "${name}" is reserved for the baseline layer and is ignored in this release.`);
-    }
-  }
 
   // Empty means "not set": the config file's failOn applies, then the default (serious).
   const failOn = core.getInput('fail-on');
@@ -82,6 +80,16 @@ export function readInputs(): Inputs {
   const maxAnnotations = Number(core.getInput('max-annotations') || '50');
   if (!Number.isInteger(maxAnnotations) || maxAnnotations < 0) {
     throw new Error('Input "max-annotations" must be a non-negative integer.');
+  }
+
+  const baselineUpdate = (core.getInput('baseline-update') || 'false').trim().toLowerCase();
+  if (!['false', 'full', 'shrink'].includes(baselineUpdate)) {
+    throw new Error(`Input "baseline-update" must be false, shrink or full, got "${baselineUpdate}".`);
+  }
+  const ageRaw = core.getInput('baseline-age-warning').trim();
+  const baselineAgeWarning = ageRaw ? Number(ageRaw) : undefined;
+  if (baselineAgeWarning !== undefined && (!Number.isInteger(baselineAgeWarning) || baselineAgeWarning < 1)) {
+    throw new Error('Input "baseline-age-warning" must be a whole number of days.');
   }
 
   return {
@@ -99,6 +107,10 @@ export function readInputs(): Inputs {
     components: core.getInput('components'),
     aliases: core.getInput('aliases'),
     themeConfig: core.getInput('theme-config'),
+    baseline: core.getInput('baseline'),
+    baselineUpdate: baselineUpdate as Inputs['baselineUpdate'],
+    baselineStrict: bool('baseline-strict', false),
+    baselineAgeWarning,
     configFile: core.getInput('config') || '.github/antd-a11y.json',
     maxAnnotations,
   };
