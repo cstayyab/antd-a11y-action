@@ -20,6 +20,9 @@ jobs:
       - run: npm ci
       - name: Install runtime sub-action dependencies
         run: npm ci --prefix runtime
+      # The theme audit's render check renders every pair in Chromium.
+      - name: Install Chromium
+        run: npx --prefix runtime playwright install --with-deps chromium
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

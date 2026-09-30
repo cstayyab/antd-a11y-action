@@ -6,7 +6,8 @@
     "checkJs": false,
     "types": ["node", "vitest/globals"],
     "paths": {
-      "eslint-plugin-antd-a11y": ["./packages/eslint-plugin-antd-a11y/src/index.ts"]
+      "eslint-plugin-antd-a11y": ["./packages/eslint-plugin-antd-a11y/src/index.ts"],
+      "playwright-core": ["./runtime/node_modules/playwright-core"]
     }
   },
   "include": ["src", "packages/*/src", "packages/*/tests", "tests", "runtime/*.ts", "vitest.config.ts"]

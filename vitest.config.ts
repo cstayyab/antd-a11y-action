@@ -19,8 +19,13 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['packages/*/tests/rules/**/*.test.ts', 'tests/**/*.test.ts'],
-          exclude: ['tests/runtime/**'],
+          exclude: ['tests/runtime/**', 'tests/theme/render.test.ts', 'tests/theme/probe.test.ts'],
         },
+      },
+      // The theme audit's pair map, rendered in Chromium for antd 5 and 6.
+      {
+        extends: true,
+        test: { name: 'theme-render', include: ['tests/theme/render.test.ts'], testTimeout: 30_000 },
       },
       // The runtime sub-action: guard, setup scripts, resolver and reporter.
       {
