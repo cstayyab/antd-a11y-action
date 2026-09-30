@@ -4,7 +4,7 @@ A GitHub Action that blocks pull requests adding accessibility problems to React
 
 Read why that gap exists, with examples: [Why axe and jsx-a11y miss Ant Design accessibility bugs (and a GitHub Action that catches them)](https://dev.to/cstayyab/why-axe-and-jsx-a11y-miss-ant-design-accessibility-bugs-and-a-github-action-that-catches-them-cn0) on DEV.
 
-> Two layers: the **static** action (10 antd rules plus jsx-a11y's recommended set, on changed files) and the **[runtime check](#runtime-check)** sub-action (starts your app, crawls routes with Playwright + axe, and in Next.js apps blames issues on the source line that rendered them). Both report through inline annotations, SARIF for Code Scanning and a sticky PR comment. The static check also runs **[locally through ESLint](#run-it-locally-with-eslint)**, with the same results, so you can catch issues before pushing. The theme contrast layer is next; see [Roadmap](#roadmap).
+> Three layers: the **static** action (10 antd rules plus jsx-a11y's recommended set, on changed files), the **[theme contrast audit](#theme-contrast-audit)** (`mode: theme`: every colour your antd theme derives, checked against WCAG in every state), and the **[runtime check](#runtime-check)** sub-action (starts your app, crawls routes with Playwright + axe, and in Next.js apps blames issues on the source line that rendered them). All report through inline annotations, SARIF for Code Scanning and a sticky PR comment. The static check also runs **[locally through ESLint](#run-it-locally-with-eslint)**, with the same results, so you can catch issues before pushing.
 
 > **Beta (0.x).** `@v0` is a branch that moves to each 0.x release, so pinning it gets fixes automatically. To stay on one version, pin a release tag (`@v0.10.0`) or a commit SHA. Inputs may still change between minor versions until 1.0, which ships once the baseline file and theme audit land; see [Roadmap](#roadmap) and the release notes before upgrading.
 
@@ -94,7 +94,8 @@ When an antd rule and a jsx-a11y rule flag the same element, only the antd findi
 | `sarif-file` | `antd-a11y.sarif` | Where to write the SARIF report |
 | `max-annotations` | `50` | Cap on inline annotations |
 | `github-token` | `${{ github.token }}` | Used to list PR files and write the comment |
-| `mode` | `static` | `theme` and `runtime` are accepted but skipped with a warning in this release |
+| `mode` | `static` | Layers to run, comma separated: `static`, `theme` (the [theme contrast audit](#theme-contrast-audit)). `runtime` is the separate sub-action. |
+| `theme-config` | | `mode: theme`: a module that exports your theme (`src/theme.ts`, or `src/theme.ts#dark` for a named export), for themes built with functions or imports. **Runs repository code**; see [Theme contrast audit](#theme-contrast-audit). |
 
 `baseline` is reserved for the baseline layer and ignored for now. The runtime check is a separate step; see below.
 
@@ -108,7 +109,7 @@ Per-rule severity works in both actions:
 - `warn` reports its findings but never blocks.
 - `error` blocks on every finding, whatever its impact or `fail-on`.
 
-Every other rule follows `fail-on`. Ids are `antd-a11y/<rule>` (or just `<rule>`), `jsx-a11y/<rule>`, `runtime/<rule>` and `axe/<rule-id>`.
+Every other rule follows `fail-on`. Ids are `antd-a11y/<rule>` (or just `<rule>`), `jsx-a11y/<rule>`, `theme/<rule>`, `runtime/<rule>` and `axe/<rule-id>`.
 
 ```yaml
       - uses: cstayyab/antd-a11y-action@v0
@@ -341,6 +342,57 @@ Every route records where it actually landed. A route that ends up on another pa
 | "Guard did not intercept any renders" | Check the inject step log; `instrumentation-client` must sit where Next expects it (root, or `src/`) |
 | Comment step skipped on fork PRs | Expected: forks get a read-only token. The job summary and artifact still have everything |
 
+## Theme contrast audit
+
+antd colours come from tokens, and most are derived: `colorPrimary` produces the hover, active, selected and link-adjacent colours, `colorTextBase` produces every text shade, and each component derives its own tokens from those. A team sets a few seed tokens and never sees the hundreds of values that result. `mode: theme` checks all of them, once, where they are defined, in every state (hover, pressed, selected, error), including states no crawled page shows.
+
+```yaml
+      - uses: cstayyab/antd-a11y-action@v0
+        with:
+          mode: static,theme
+```
+
+**Finding the theme.** By default nothing in your repository runs. The audit reads `<ConfigProvider theme={…}>` props and objects typed or checked as `ThemeConfig` (`const t: ThemeConfig = …`, `… satisfies ThemeConfig`) when they are literal: values, antd's `theme.darkAlgorithm` / `compactAlgorithm`, and constants in the same file.
+- A conditional (`algorithm: dark ? darkAlgorithm : defaultAlgorithm`) gives one configuration per branch, named in the report ("src/App.tsx:12 (dark)").
+- Nested providers are merged the way antd merges them, including `inherit: false`.
+- A theme it can't read (imported from another file, built by a function) is listed as skipped, with the reason. It is never guessed.
+
+For those, point `theme-config` at the module that exports it: the default export or `theme` (or `path#name`), which can be one theme, an array, or an object of named themes (`{ light, dark }`). The module is evaluated in a separate Node process with only `PATH` in its environment (no token) and a 30-second limit; it is bundled with your own `esbuild` if you have one, so TSX and extensionless imports work. Run `npm ci` before the step so its imports resolve. **This runs your repository's code**, the same trust as the runtime check: use it on `pull_request`, never `pull_request_target`.
+
+**Deriving the tokens.** The audit uses your installed antd, so the values match what ships. The static job doesn't need `npm ci`, so without it the action uses a bundled antd of the major your `package.json` declares, and says so. Global tokens come from antd's own `getDesignToken`, and component tokens from each component's token derivation, with your `components.*` overrides (and `algorithm: true`) applied as `ConfigProvider` does. antd 5 and 6 are supported.
+
+**Which colour sits on which.** Tokens alone don't say that, so the action ships a [map](src/theme/pairs.ts) of about 375 foreground/background pairs per antd major: the Primary button label on `colorPrimary` in each state, `Menu.itemSelectedColor` on `Menu.itemSelectedBg`, the Input border on `colorBgContainer`, and so on. Two tests keep it honest:
+- **Coverage.** Every colour token antd derives, global or per component, must be in a pair or on a [documented list](src/theme/not-pairs.ts) of tokens that aren't a foreground/background pair (palette swatches, shadows, the modal mask, decorative dividers), with the reason. CI fails when a new antd release adds a token that is in neither.
+- **Rendering.** CI renders the pairs in Chromium for antd 5 and 6 with a fingerprint theme, where every token has a unique colour. It checks each element's computed colour comes from exactly the token the pair names, so a change in antd's styles fails the build instead of skewing the audit. 264 pairs are checked this way. The rest are states a static render can't reach (a date range being hovered, a popup submenu, a sorted column), or text tokens antd defines but no component uses (`colorPrimaryText`, `colorInfoText`), which are checked for their documented purpose on `colorBgContainer`.
+
+**Rules.**
+
+| Rule | Checks | Needs | Impact |
+| --- | --- | --- | --- |
+| `theme/text-contrast` | Text colours on their background (WCAG 1.4.3) | 4.5:1, or 3:1 for large text (24px, or 18.66px at `fontWeightStrong`) | serious |
+| `theme/non-text-contrast` | Borders, indicators and icons that identify a control or its state (1.4.11): input and checkbox borders, the switch track, the selected-tab bar | 3:1 | serious |
+| `theme/placeholder-contrast` | Placeholder text (1.4.3), separate so you can set it on its own | 4.5:1 | moderate |
+| `theme/text-contrast-enhanced` | WCAG AAA (1.4.6). Off unless you set it in `rules` | 7:1, or 4.5:1 large | minor |
+
+Translucent colours are composited over their real background first. Disabled controls are exempt (WCAG exempts inactive components), and so are ghost buttons, whose background is whatever your app puts behind them. Inputs are checked per variant: the outlined border, or the filled background.
+
+**Reading a finding.** Each names the configuration, the elements and states affected, both colours and the ratio, and where the colour comes from. That is the token your theme sets for either side (the finding points at its line), or the seed it derives from ("`colorPrimaryHover`, derived from `token.colorPrimary`"). It also suggests the smallest change that passes: a same-hue colour, or a more opaque one for antd's translucent text shades, on whichever side needs less. For a derived token the suggestion overrides that token, since changing the seed moves every sibling. Pairs that fail with the same colours are reported once.
+
+**Findings antd's default theme already has.** antd's defaults fail some pairs, e.g. `colorTextPlaceholder` at 1.83:1 and white on `colorPrimary` at 4.10:1. A finding is *inherited* when the pair is no worse than in antd's default theme with the same algorithm; the report marks it "antd default". Inherited findings are warnings by default, so adopting the audit doesn't fail on antd's own colours. Anything your theme made worse follows `fail-on` and `rules` as usual. To change that:
+
+```json
+{
+  "theme": { "inherited": "error" },
+  "rules": { "theme/placeholder-contrast": "warn", "theme/text-contrast-enhanced": "warn" }
+}
+```
+
+`theme.inherited` takes `warn` (default), `error` or `off`. `theme.config` is the file form of the `theme-config` input.
+
+**On pull requests** with `changed-only` (the default), the theme is audited only when the PR changes a file that defines a theme, the `theme-config` module or its directory, `package.json` or a lockfile, or the config file. Otherwise the comment says it was skipped.
+
+**Not covered:** CSS outside the token system (hand-written styles, CSS modules, `style` props, images, gradients); the runtime check's axe run covers what renders. antd 4 (Less variables) is out of scope, as it is for the static rules.
+
 ## Suppressing a finding
 
 ```jsx
@@ -403,7 +455,7 @@ To block a push on it, run it from a git hook (husky, lefthook) or an npm script
 **Limits:**
 - **Flat config only (ESLint 9).** The legacy `plugin:antd-a11y/recommended-legacy` preset has the antd rules only.
 - **One processor per file.** The deduplication, `a11y-ignore` handling and blocking-based severity run as an ESLint processor. If your config already applies another processor to `.jsx`/`.tsx` files, use `antdA11y.config({ processor: false })`: the rules, settings and filters still apply, but every finding shows as an error, and `a11y-ignore` isn't read (`eslint-disable` still works).
-- **Only the static check.** The runtime check and the theme audit need a running app or a theme, not a lint pass.
+- **Only the static check.** The runtime check needs a running app, and the theme audit runs in the action (`mode: theme`).
 
 For the antd rules alone, without the action's config, `antdA11y.configs.recommended` still works.
 
@@ -412,7 +464,7 @@ For the antd rules alone, without the action's config, `antdA11y.configs.recomme
 | Phase | Scope |
 | --- | --- |
 | **MVP** | 10 static antd rules, SARIF, sticky PR comment, changed-files mode |
-| **v1 (in progress)** | Done: runtime check (Next.js guard + axe, generic axe crawl) with sign-in and redirect detection (0.9.0); WCAG criteria on every finding and per-rule configuration (0.9.1); wrapper component aliases (0.9.2, refined in 0.9.3); the same check locally through ESLint (0.10.0). Next: [baseline file](https://github.com/cstayyab/antd-a11y-action/issues/1), theme-token contrast audit, Storybook stories |
+| **v1 (in progress)** | Done: runtime check (Next.js guard + axe, generic axe crawl) with sign-in and redirect detection (0.9.0); WCAG criteria on every finding and per-rule configuration (0.9.1); wrapper component aliases (0.9.2, refined in 0.9.3); the same check locally through ESLint (0.10.0); theme contrast audit (next release). Next: [baseline file](https://github.com/cstayyab/antd-a11y-action/issues/1), Storybook stories |
 | v1.1 | WCAG 2.2 runtime checks (focus not obscured, target size) |
 | v2 | Autofix via suggested changes, antd v4 support |
 
@@ -420,8 +472,9 @@ For the antd rules alone, without the action's config, `antdA11y.configs.recomme
 
 ```sh
 npm ci
-npm ci --prefix runtime   # runner deps for the runtime sub-action
-npm run check   # typecheck + lint + tests (rules, DOM checks against antd 5 and 6, runtime)
+npm ci --prefix runtime   # runner deps for the runtime sub-action (and Playwright for the theme render check)
+npx --prefix runtime playwright install chromium
+npm run check   # typecheck + lint + tests (rules, DOM checks and theme pairs against antd 5 and 6, runtime)
 npm run build   # bundles the action into dist/ (commit the result)
 ```
 
