@@ -48,7 +48,8 @@ Nothing to install: the action ships its own parser and rules and ignores your E
 | [`picker-has-name`](docs/rules/picker-has-name.md) | Unlabelled `Select`, `DatePicker`, `RangePicker`, `TimePicker`, `Cascader`, `TreeSelect`, `AutoComplete` | serious · moderate if placeholder-only |
 | [`form-control-has-name`](docs/rules/form-control-has-name.md) | Unlabelled `Input*`, `InputNumber`, `Switch`, `Slider`, bare `Checkbox`/`Radio` | serious · moderate if placeholder-only |
 | [`form-item-has-label`](docs/rules/form-item-has-label.md) | `Form.Item` with `name` but no `label` around an unnamed control | serious |
-| [`modal-has-title`](docs/rules/modal-has-title.md) | `Modal` / `Drawer` without `title` (unnamed dialog) | serious |
+| [`modal-has-title`](docs/rules/modal-has-title.md) | `Modal` / `Drawer` without a `title` that has text, `aria-label` on `Modal` (antd drops it), and `Modal.confirm()` / `modal.info()` from the hooks without a `title` | serious |
+| [`modal-title-no-control`](docs/rules/modal-title-no-control.md) | A button or link inside a dialog `title` (it joins the dialog name), and a second close button next to antd's own | moderate |
 | [`table-column-has-title`](docs/rules/table-column-has-title.md) | Table columns with a missing or empty `title` | moderate |
 | [`image-has-alt`](docs/rules/image-has-alt.md) | antd `Image` without `alt` | serious |
 | [`tooltip-no-disabled-child`](docs/rules/tooltip-no-disabled-child.md) | `Tooltip` / `Popover` around a disabled `Button`, directly or through a `<span>` wrapper (keyboard can't reach it) | serious |
@@ -318,7 +319,7 @@ Every route records where it actually landed. A route that ends up on another pa
 | `interactions` | | ESM module run on each route before scanning |
 | `setup` | | ESM module run once before the crawl, e.g. to sign in; its session is reused for every route |
 | `fail-on-redirect` | `false` | Fail when a route ends up on a different path (e.g. `/login`) |
-| `wcag-tags` | `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa` | axe tags |
+| `wcag-tags` | `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa` | axe tags. `aria-dialog-name` also runs (axe tags it best-practice, but an unnamed dialog fails WCAG 4.1.2); turn it off with `axe/aria-dialog-name: off` in `rules` |
 | `fail-on` | `serious` | `minor`, `moderate`, `serious`, `critical` or `none` |
 | `require-guard` | `true` | Next mode: fail if the guard intercepted nothing |
 | `comment` | `true` | Sticky PR comment (separate from the static one) |

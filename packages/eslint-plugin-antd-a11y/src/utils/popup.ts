@@ -111,33 +111,53 @@ function isFocusableElement(node: Opening, resolver: AntdResolver): boolean {
 }
 
 /**
- * True when a focusable, enabled control sits somewhere inside the element: `<span><Button>Add</Button></span>`.
- * Focus and click events bubble from it to the wrapper antd listens on, so the popup is keyboard-reachable
- * (checked in the DOM tests). Follows children, conditional branches and `const` JSX variables; an unknown
- * component counts only through the children it is given.
+ * The first focusable, enabled control in a JSX subtree. Follows children, fragments, conditional
+ * branches and `const` JSX variables; an unknown component counts only through the children it is
+ * given. With `includeRoot` the node itself counts too (a `title={<Button />}` prop value).
  */
-export function hasFocusableDescendant(element: TSESTree.JSXElement, resolver: AntdResolver, sourceCode: SourceCode): boolean {
+export function findFocusable(
+  root: TSESTree.Node,
+  resolver: AntdResolver,
+  sourceCode: SourceCode,
+  includeRoot = true,
+): Opening | null {
   const seen = new Set<TSESTree.Node>();
-  const visit = (node: TSESTree.Node | null | undefined, depth: number): boolean => {
-    if (!node || depth > 8 || seen.has(node)) return false;
+  const visit = (node: TSESTree.Node | null | undefined, depth: number): Opening | null => {
+    if (!node || depth > 8 || seen.has(node)) return null;
     seen.add(node);
     switch (node.type) {
       case AST_NODE_TYPES.JSXElement:
-        if (depth > 0 && isFocusableElement(node.openingElement, resolver)) return true;
-        return node.children.some((child) => visit(child, depth + 1));
+        if ((includeRoot || depth > 0) && isFocusableElement(node.openingElement, resolver)) return node.openingElement;
+        return first(node.children, depth + 1);
       case AST_NODE_TYPES.JSXFragment:
-        return node.children.some((child) => visit(child, depth + 1));
+        return first(node.children, depth + 1);
       case AST_NODE_TYPES.JSXExpressionContainer:
-        return node.expression.type !== AST_NODE_TYPES.JSXEmptyExpression && visit(node.expression, depth);
+        return node.expression.type === AST_NODE_TYPES.JSXEmptyExpression ? null : visit(node.expression, depth);
       case AST_NODE_TYPES.LogicalExpression:
         return visit(node.right, depth);
       case AST_NODE_TYPES.ConditionalExpression:
-        return visit(node.consequent, depth) || visit(node.alternate, depth);
+        return visit(node.consequent, depth) ?? visit(node.alternate, depth);
       case AST_NODE_TYPES.Identifier:
         return visit(resolveJsx(node, sourceCode), depth);
       default:
-        return false;
+        return null;
     }
   };
-  return visit(element, 0);
+  const first = (nodes: TSESTree.Node[], depth: number): Opening | null => {
+    for (const child of nodes) {
+      const found = visit(child, depth);
+      if (found) return found;
+    }
+    return null;
+  };
+  return visit(root, 0);
+}
+
+/**
+ * True when a focusable, enabled control sits somewhere inside the element: `<span><Button>Add</Button></span>`.
+ * Focus and click events bubble from it to the wrapper antd listens on, so the popup is keyboard-reachable
+ * (checked in the DOM tests).
+ */
+export function hasFocusableDescendant(element: TSESTree.JSXElement, resolver: AntdResolver, sourceCode: SourceCode): boolean {
+  return findFocusable(element, resolver, sourceCode, false) !== null;
 }

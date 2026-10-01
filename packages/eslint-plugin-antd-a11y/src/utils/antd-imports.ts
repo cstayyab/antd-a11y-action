@@ -157,6 +157,8 @@ export interface AntdResolver {
   componentName(node: TSESTree.JSXOpeningElement): string | null;
   /** True when the element is an icon component from @ant-design/icons. */
   isIcon(node: TSESTree.JSXOpeningElement): boolean;
+  /** Canonical antd name of an expression such as `Modal.confirm` or `App.useApp`, or null. */
+  memberName(node: TSESTree.Expression): string | null;
 }
 
 export function createResolver(context: Readonly<TSESLint.RuleContext<string, readonly unknown[]>>): AntdResolver {
@@ -187,6 +189,14 @@ export function createResolver(context: Readonly<TSESLint.RuleContext<string, re
     },
     isIcon(node) {
       return lookup(node)?.kind === 'icon';
+    },
+    memberName(node) {
+      const expr = unwrapExpression(node);
+      const scope = context.sourceCode.getScope(expr);
+      let binding: Binding = null;
+      if (expr.type === AST_NODE_TYPES.Identifier) binding = resolveIdentifier(scope, expr.name);
+      else if (expr.type === AST_NODE_TYPES.MemberExpression) binding = resolveMember(scope, expr, 0);
+      return binding?.kind === 'component' ? binding.name : null;
     },
   };
 }

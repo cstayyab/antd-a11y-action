@@ -5,6 +5,7 @@ import formItemHasLabel from './rules/form-item-has-label.js';
 import iconButtonHasName from './rules/icon-button-has-name.js';
 import imageHasAlt from './rules/image-has-alt.js';
 import modalHasTitle from './rules/modal-has-title.js';
+import modalTitleNoControl from './rules/modal-title-no-control.js';
 import pickerHasName from './rules/picker-has-name.js';
 import popupTriggerFocusable from './rules/popup-trigger-focusable.js';
 import tableColumnHasTitle from './rules/table-column-has-title.js';
@@ -19,6 +20,7 @@ export const rules = {
   'form-control-has-name': formControlHasName,
   'form-item-has-label': formItemHasLabel,
   'modal-has-title': modalHasTitle,
+  'modal-title-no-control': modalTitleNoControl,
   'table-column-has-title': tableColumnHasTitle,
   'image-has-alt': imageHasAlt,
   'tooltip-no-disabled-child': tooltipNoDisabledChild,

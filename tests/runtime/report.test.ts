@@ -117,6 +117,22 @@ describe('buildRuntimeResult', () => {
     expect(byId('axe/region')[0].wcag).toEqual([]);
   });
 
+  it('maps aria-dialog-name, which axe tags best-practice only, to 4.1.2', () => {
+    const dialog = buildRuntimeResult(
+      [
+        {
+          route: '/',
+          status: 200,
+          guard,
+          runtime: [],
+          axe: [{ id: 'aria-dialog-name', impact: 'serious', help: 'ARIA dialog nodes should have an accessible name', tags: ['cat.aria', 'best-practice'], targets: ['.ant-modal'] }],
+        },
+      ],
+      opts,
+    );
+    expect(dialog.findings[0]).toMatchObject({ ruleId: 'axe/aria-dialog-name', wcag: ['4.1.2'], blocking: true });
+  });
+
   it('never blocks with fail-on none', () => {
     expect(buildRuntimeResult(pages, { ...opts, failOn: 'none' }).findings.some((f) => f.blocking)).toBe(false);
   });

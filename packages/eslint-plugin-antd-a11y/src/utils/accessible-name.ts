@@ -1,7 +1,8 @@
-import { TSESTree, AST_NODE_TYPES } from '@typescript-eslint/utils';
+import { TSESTree, AST_NODE_TYPES, type TSESLint } from '@typescript-eslint/utils';
 import type { AntdResolver } from './antd-imports.js';
 import { wrapperNamesElement } from './aliases.js';
-import { hasMeaningfulProp, hasSpread, meaningfulChildren, parentElement } from './jsx.js';
+import { hasMeaningfulProp, hasSpread, intrinsicName, meaningfulChildren, parentElement, propValue } from './jsx.js';
+import { resolveJsx } from './popup.js';
 
 type Opening = TSESTree.JSXOpeningElement;
 
@@ -49,6 +50,54 @@ export function hasTextContent(
     }
     return true;
   });
+}
+
+/**
+ * True when a JSX value (a `title={…}` prop, say) can give an accessible name: it holds text, an
+ * expression that may render text, or an element named with `aria-label` / `img alt`. Empty elements,
+ * unnamed antd icons and bare `svg` give an empty name, or only the icon's English id. Components we
+ * can't see into count as text, so the check stays quiet when it can't tell.
+ */
+export function jsxHasText(
+  node: TSESTree.Node,
+  resolver: AntdResolver,
+  sourceCode: Readonly<TSESLint.SourceCode>,
+  depth = 0,
+): boolean {
+  if (depth > 8) return true;
+  const inner = (child: TSESTree.Node): boolean => jsxHasText(child, resolver, sourceCode, depth + 1);
+  switch (node.type) {
+    case AST_NODE_TYPES.JSXText:
+      return node.value.trim().length > 0;
+    case AST_NODE_TYPES.Literal:
+      return typeof node.value === 'string' ? node.value.trim().length > 0 : typeof node.value === 'number';
+    case AST_NODE_TYPES.JSXExpressionContainer:
+      return node.expression.type !== AST_NODE_TYPES.JSXEmptyExpression && inner(node.expression);
+    case AST_NODE_TYPES.JSXFragment:
+      return node.children.some(inner);
+    case AST_NODE_TYPES.Identifier: {
+      if (node.name === 'undefined') return false;
+      const element = resolveJsx(node, sourceCode);
+      return element ? inner(element) : true;
+    }
+    case AST_NODE_TYPES.JSXElement: {
+      const opening = node.openingElement;
+      if (hasSpread(opening) || hasMeaningfulProp(opening, 'aria-label') || hasMeaningfulProp(opening, 'aria-labelledby')) {
+        return true;
+      }
+      const hidden = propValue(opening, 'aria-hidden');
+      if (hidden === true || hidden === 'true' || resolver.isIcon(opening)) return false;
+      const tag = intrinsicName(opening);
+      if (tag === 'img') return hasMeaningfulProp(opening, 'alt');
+      if (tag === 'svg' || tag === 'i') return false;
+      // A component that isn't antd's may render text we can't see.
+      if (tag === null && !resolver.componentName(opening)) return true;
+      return node.children.some(inner);
+    }
+    default:
+      // Any other expression (a call, a member, a template with values) may render text.
+      return true;
+  }
 }
 
 export interface FormItemContext {

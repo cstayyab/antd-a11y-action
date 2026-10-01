@@ -8,7 +8,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import axe from 'axe-core';
 import { computeAccessibleName } from 'dom-accessibility-api';
-import type { ReactElement } from 'react';
+import { useEffect, type ReactElement } from 'react';
 import {
   Button,
   Checkbox,
@@ -27,7 +27,7 @@ import {
   Tooltip,
   version as antdVersion,
 } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { CloseOutlined, DeleteOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { afterEach, describe, expect, it } from 'vitest';
 
 // vitest.config.ts runs this file once per antd major; make sure the alias really took.
@@ -212,6 +212,81 @@ describe('modal-has-title', () => {
       </Drawer>,
     );
     expect(nameOf(drawer, '[role="dialog"]')).toBe('Filters');
+  });
+  it('dropped: aria-label and aria-labelledby on Modal never reach role="dialog"', async () => {
+    const labelled = mount(
+      <Modal open aria-label="Edit profile" getContainer={false}>
+        Body
+      </Modal>,
+    );
+    expect(nameOf(labelled, '[role="dialog"]')).toBe('');
+    expect(await axeViolations(labelled, ['aria-dialog-name'])).toContain('aria-dialog-name');
+    cleanup();
+    const referenced = mount(
+      <>
+        <h2 id="profile-heading">Edit profile</h2>
+        <Modal open aria-labelledby="profile-heading" getContainer={false}>
+          Body
+        </Modal>
+      </>,
+    );
+    expect(nameOf(referenced, '[role="dialog"]')).toBe('');
+  });
+  it('valid: Drawer forwards aria-label to role="dialog"', () => {
+    const c = mount(
+      <Drawer open aria-label="Filters" getContainer={false}>
+        Body
+      </Drawer>,
+    );
+    expect(nameOf(c, '[role="dialog"]')).toBe('Filters');
+  });
+  it('emptyTitle: a title with no text gives an empty name, or the icon id', async () => {
+    const fragment = mount(
+      <Modal open title={<></>} getContainer={false}>
+        <h2>Settings</h2>
+      </Modal>,
+    );
+    expect(nameOf(fragment, '[role="dialog"]')).toBe('');
+    expect(await axeViolations(fragment, ['aria-dialog-name'])).toContain('aria-dialog-name');
+    cleanup();
+    const drawer = mount(
+      <Drawer open title={<></>} getContainer={false}>
+        Body
+      </Drawer>,
+    );
+    expect(nameOf(drawer, '[role="dialog"]')).toBe('');
+    cleanup();
+    const icon = mount(
+      <Modal open title={<InfoCircleOutlined />} getContainer={false}>
+        Body
+      </Modal>,
+    );
+    expect(nameOf(icon, '[role="dialog"]')).toBe('info-circle');
+  });
+  it('modal-title-no-control: a control in title joins the dialog name', () => {
+    const c = mount(
+      <Modal open closable={false} getContainer={false} title={<>Edit order <Button aria-label="Close" icon={<CloseOutlined />} /></>}>
+        Body
+      </Modal>,
+    );
+    expect(nameOf(c, '[role="dialog"]')).toMatch(/^Edit order close$/i);
+  });
+  it('imperative: modal.confirm() without a title opens an unnamed dialog', async () => {
+    function Confirm({ title }: { title?: string }) {
+      const [modal, holder] = Modal.useModal();
+      useEffect(() => {
+        modal.confirm({ title, content: 'Delete this invoice?' });
+      }, [modal, title]);
+      return <>{holder}</>;
+    }
+    render(<Confirm />);
+    await act(async () => {});
+    expect(nameOf(document.body, '[role="dialog"]')).toBe('');
+    cleanup();
+    document.body.innerHTML = '';
+    render(<Confirm title="Delete this invoice?" />);
+    await act(async () => {});
+    expect(nameOf(document.body, '[role="dialog"]')).toBe('Delete this invoice?');
   });
 });
 

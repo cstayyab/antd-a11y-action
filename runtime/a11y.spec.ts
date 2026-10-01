@@ -9,6 +9,8 @@ const routes: string[] = JSON.parse(fs.readFileSync(process.env.A11Y_ROUTES_FILE
 const OUT = process.env.A11Y_OUT!;
 const CWD = process.env.A11Y_CWD!;
 const TAGS = (process.env.IN_TAGS || "wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa").split(",").map((t) => t.trim());
+// Outside the WCAG tags, but each one maps to a WCAG failure (see src/runtime/rules.ts AXE_WCAG).
+const EXTRA_RULES = ["aria-dialog-name"];
 const slug = (r: string) => (r === "/" ? "root" : r.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, ""));
 const samePath = (a: string, b: string) => a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
 
@@ -64,6 +66,12 @@ for (const route of routes) {
     });
 
     const axe = await new AxeBuilder({ page }).withTags(TAGS).exclude("nextjs-portal").analyze();
+    // axe tags aria-dialog-name best-practice only, but an unnamed dialog fails 4.1.2: run it on its own.
+    if (!TAGS.includes("best-practice")) {
+      const dialogs = await new AxeBuilder({ page }).withRules(EXTRA_RULES).exclude("nextjs-portal").analyze();
+      const seen = new Set(axe.violations.map((v) => v.id));
+      axe.violations.push(...dialogs.violations.filter((v) => !seen.has(v.id)));
+    }
 
     fs.writeFileSync(
       path.join(OUT, `${slug(route)}.json`),

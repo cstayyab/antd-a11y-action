@@ -184,11 +184,11 @@ describe('configuration (C and C2)', () => {
   it('warns when every antd rule is off and notes overrides for reviewers', () => {
     const allOff = [
       'icon-button-has-name', 'picker-has-name', 'form-control-has-name', 'form-item-has-label', 'modal-has-title',
-      'table-column-has-title', 'image-has-alt', 'tooltip-no-disabled-child', 'popup-trigger-focusable', 'auth-input-autocomplete',
+      'modal-title-no-control', 'table-column-has-title', 'image-has-alt', 'tooltip-no-disabled-child', 'popup-trigger-focusable', 'auth-input-autocomplete',
     ].map((r) => `${r}: off`).join('\n');
     const config = resolveConfig({ workspace, rules: allOff });
     expect(configWarnings(config)).toHaveLength(1);
-    expect(overridesNote(config, ['antd-a11y/', 'jsx-a11y/'])).toBe('10 rules overridden (inputs): 10 off');
+    expect(overridesNote(config, ['antd-a11y/', 'jsx-a11y/'])).toBe('11 rules overridden (inputs): 11 off');
     expect(overridesNote(resolveConfig({ workspace }), ['antd-a11y/'])).toBeUndefined();
   });
 

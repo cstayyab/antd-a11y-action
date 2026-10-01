@@ -31,6 +31,11 @@ export const RUNTIME_RULES: Record<string, { impact: Impact; wcag: string[]; des
   'no-positive-tabindex': { impact: 'moderate', wcag: ['2.4.3'], description: 'tabIndex greater than 0 breaks focus order' },
 };
 
+/** axe rules that axe tags best-practice only, and the WCAG criteria their failure breaks. */
+export const AXE_WCAG: Record<string, string[]> = {
+  'aria-dialog-name': ['4.1.2'],
+};
+
 const AXE_IMPACTS = new Set<Impact>(['minor', 'moderate', 'serious', 'critical']);
 
 export function runtimeRuleInfo(rule: string): RuleInfo {
@@ -54,5 +59,6 @@ export function axeRuleInfo(
   impact: Impact,
   tags: readonly string[] = [],
 ): RuleInfo {
-  return { id: `${AXE_PREFIX}${id}`, description: help, helpUri: helpUrl, wcag: fromAxeTags(tags), impact };
+  const wcag = fromAxeTags(tags);
+  return { id: `${AXE_PREFIX}${id}`, description: help, helpUri: helpUrl, wcag: wcag.length ? wcag : (AXE_WCAG[id] ?? []), impact };
 }
