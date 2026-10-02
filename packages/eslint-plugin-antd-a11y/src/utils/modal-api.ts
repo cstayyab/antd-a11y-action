@@ -19,9 +19,23 @@ function unwrap(expr: TSESTree.Expression): TSESTree.Expression {
 const isCallTo = (expr: TSESTree.Expression | null, name: string, resolver: AntdResolver): expr is TSESTree.CallExpression =>
   !!expr && expr.type === AST_NODE_TYPES.CallExpression && resolver.memberName(expr.callee as TSESTree.Expression) === name;
 
+/** `app` in `const app = App.useApp()`. */
+function isUseAppResult(expr: TSESTree.Expression, resolver: AntdResolver, sourceCode: Readonly<TSESLint.SourceCode>): boolean {
+  if (expr.type !== AST_NODE_TYPES.Identifier) return false;
+  const variable = ASTUtils.findVariable(sourceCode.getScope(expr), expr.name);
+  if (!variable || variable.defs.length !== 1 || variable.defs[0].type !== 'Variable') return false;
+  const declarator = variable.defs[0].node;
+  return (
+    declarator.parent.kind === 'const' &&
+    declarator.id.type === AST_NODE_TYPES.Identifier &&
+    !!declarator.init &&
+    isCallTo(unwrap(declarator.init), 'App.useApp', resolver)
+  );
+}
+
 /**
- * True for the object a hook hands out to open dialogs: `App.useApp().modal`, `modal` from
- * `const { modal } = App.useApp()`, or `modal` from `const [modal, holder] = Modal.useModal()`.
+ * True for the object a hook hands out to open dialogs: `App.useApp().modal`, `app.modal` from
+ * `const app = App.useApp()`, `modal` from `const { modal } = App.useApp()`, or `modal` from `const [modal, holder] = Modal.useModal()`.
  */
 function isModalApi(expr: TSESTree.Expression, resolver: AntdResolver, sourceCode: Readonly<TSESLint.SourceCode>): boolean {
   if (
@@ -30,7 +44,8 @@ function isModalApi(expr: TSESTree.Expression, resolver: AntdResolver, sourceCod
     expr.property.type === AST_NODE_TYPES.Identifier &&
     expr.property.name === 'modal'
   ) {
-    return isCallTo(unwrap(expr.object), 'App.useApp', resolver);
+    const object = unwrap(expr.object);
+    return isCallTo(object, 'App.useApp', resolver) || isUseAppResult(object, resolver, sourceCode);
   }
   if (expr.type !== AST_NODE_TYPES.Identifier) return false;
   const variable = ASTUtils.findVariable(sourceCode.getScope(expr), expr.name);

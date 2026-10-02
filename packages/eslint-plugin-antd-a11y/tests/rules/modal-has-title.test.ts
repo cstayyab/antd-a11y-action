@@ -29,6 +29,7 @@ run('modal-has-title', rule, {
     a(`<Modal open title={<InfoCircleOutlined aria-label="Details" />} />`),
     a(`<Modal open title={<HeadingFromElsewhere />} />`),
     a(`<Modal open title={heading} />`),
+    `import { Image, Modal } from 'antd'; <Modal open title={<Image alt="Company logo" src="x.png" preview={false} />} />`,
     a(`const heading = <h2>Settings</h2>; <Modal open title={heading} />`),
     // a fragment in a const isn't followed, so the rule can't tell
     a(`const blank = <></>; <Modal open title={blank} />`),
@@ -69,6 +70,7 @@ run('modal-has-title', rule, {
     { code: a(`function C() { const { modal } = App.useApp(); modal.info({ content: 'Saved' }); }`), errors: [imperative] },
     { code: a(`function C() { const { modal: dialogs } = App.useApp(); dialogs.warn({}); }`), errors: [imperative] },
     { code: a(`function C() { App.useApp().modal.confirm({ content: 'x' }); }`), errors: [imperative] },
+    { code: a(`function C() { const app = App.useApp(); app.modal.info({ content: 'x' }); }`), errors: [imperative] },
     { code: a(`function C() { const [modal, holder] = Modal.useModal(); modal.confirm({ content: 'x' }); }`), errors: [imperative] },
   ],
 });

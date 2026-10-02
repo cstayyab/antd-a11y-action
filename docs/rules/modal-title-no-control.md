@@ -7,10 +7,10 @@ Keep buttons and links out of a dialog's `title`, and don't add a second close b
 
 The rule reports:
 
-- **`control`**: a `Button`, native `button`, link, or antd form control inside the `title` of a `Modal` or `Drawer`. antd names the dialog with `aria-labelledby` pointing at the title, so the name is all the text in it: a close button there gives a name like "Edit order Close".
-- **`duplicateClose`**: a `Modal` that keeps antd's own close button (`closable` isn't `false`) and also has a close control in its `title` or body. Two close buttons with different names ("Close" and "Close dialog") confuse users. The rule counts a control as a close control when it has a `CloseOutlined` icon, an `aria-label` or text starting with "Close", or the same `onClick` as the Modal's `onCancel`. Buttons in `footer` aren't checked: that is antd's normal Cancel / OK slot.
+- **`control`**: a `Button`, native `button`, link, or antd form control inside the `title` of a `Modal` or `Drawer`. antd names the dialog with `aria-labelledby` pointing at the title, so the name is all the text in it: a close button there gives a name like "Edit order Close". A `Drawer` with its own `aria-labelledby` takes its name from there instead, so it isn't checked.
+- **`duplicateClose`**: a `Modal` that keeps antd's own close button and also has a close control in its `title` or body. Two close buttons with different names ("Close" and "Close dialog") confuse users. antd's button is gone with `closable={false}`, `closeIcon={null}` or `closeIcon={false}`; a `closable` the rule can't read counts as gone too. A close control is a button or link with a `CloseOutlined` icon, an `aria-label` or text that is just "Close" (or "Close dialog", "×"), or, when it has no visible text, the same `onClick` as the Modal's `onCancel`. A labelled Cancel or Done button, an action like "Close account", buttons in `footer` (antd's normal Cancel / OK slot) and a nested dialog's own controls aren't counted.
 
-A spread on the dialog or on the control keeps the rule quiet.
+A spread on the dialog or on the control keeps `duplicateClose` quiet.
 
 ## Fails
 

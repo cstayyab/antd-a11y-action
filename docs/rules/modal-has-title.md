@@ -12,7 +12,7 @@ The rule reports:
 - **`missing`**: no `title`, or an empty one (`title=""`, `title={null}`).
 - **`dropped`**: `aria-label` or `aria-labelledby` on `Modal`. antd passes neither to `role="dialog"` (rc-dialog copies only `data-*` to its root and sets its own `aria-labelledby`), so the dialog stays unnamed. `Drawer` is different: rc-drawer forwards `aria-*`, so they do name a `Drawer`.
 - **`emptyTitle`**: a JSX `title` with no text, such as `title={<></>}`, a lone icon (the name becomes its English id, "info-circle"), or an empty `<span>`. antd still sets `aria-labelledby`, so the name is empty. A heading in the body does not help: `aria-labelledby` points only at antd's title node.
-- **`imperative`**: `Modal.confirm()`, `.info()`, `.success()`, `.error()`, `.warning()` and `.warn()`, and the same calls on the object from `App.useApp()` (`const { modal } = App.useApp()`) or `Modal.useModal()` (`const [modal, holder] = Modal.useModal()`), without a `title`. They render the same dialog, and without a `title` it has no name.
+- **`imperative`**: `Modal.confirm()`, `.info()`, `.success()`, `.error()`, `.warning()` and `.warn()`, and the same calls on the object from `App.useApp()` (`const { modal } = App.useApp()`, `const app = App.useApp(); app.modal…`) or `Modal.useModal()` (`const [modal, holder] = Modal.useModal()`), without a `title`. They render the same dialog, and without a `title` it has no name.
 
 A `title` whose value the rule can't read (a variable, `t('key')`, a component) counts as a name. A spread on the element, a call argument that isn't an object literal, or a spread inside it, keeps the rule quiet.
 

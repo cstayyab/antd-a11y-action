@@ -69,8 +69,8 @@ for (const route of routes) {
     // axe tags aria-dialog-name best-practice only, but an unnamed dialog fails 4.1.2: run it on its own.
     if (!TAGS.includes("best-practice")) {
       const dialogs = await new AxeBuilder({ page }).withRules(EXTRA_RULES).exclude("nextjs-portal").analyze();
-      const seen = new Set(axe.violations.map((v) => v.id));
-      axe.violations.push(...dialogs.violations.filter((v) => !seen.has(v.id)));
+      const axeIds = new Set(axe.violations.map((v) => v.id));
+      axe.violations.push(...dialogs.violations.filter((v) => !axeIds.has(v.id)));
     }
 
     fs.writeFileSync(

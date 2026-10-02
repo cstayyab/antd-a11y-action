@@ -88,7 +88,8 @@ export function jsxHasText(
       const hidden = propValue(opening, 'aria-hidden');
       if (hidden === true || hidden === 'true' || resolver.isIcon(opening)) return false;
       const tag = intrinsicName(opening);
-      if (tag === 'img') return hasMeaningfulProp(opening, 'alt');
+      // antd Image renders <img alt>, so it names its parent the same way.
+      if (tag === 'img' || (tag === null && resolver.componentName(opening) === 'Image')) return hasMeaningfulProp(opening, 'alt');
       if (tag === 'svg' || tag === 'i') return false;
       // A component that isn't antd's may render text we can't see.
       if (tag === null && !resolver.componentName(opening)) return true;
